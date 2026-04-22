@@ -56,6 +56,7 @@ export type App = {
   testing_instructions: string | null
   monetization_model: MonetizationModel | null
   monetization_description: string | null
+  monetization_setup_complete: boolean
   posthog_project_id: string | null
   current_stage: AppStage
   stage_entered_at: string
