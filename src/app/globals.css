@@ -1,26 +1,182 @@
 @import "tailwindcss";
 
+/* ============================================================
+ * TAIKO LAUNCHPAD — Editorial Operations Console
+ * Dark by default. Warm-black backgrounds, soft off-white fg,
+ * terracotta accent used sparingly for state and emphasis.
+ * ============================================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Type scale — editorial, generous leading */
+  --font-display: var(--font-instrument-serif), "Iowan Old Style", "Palatino",
+    Georgia, serif;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Consolas,
+    monospace;
+
+  /* Warm-dark palette (default) */
+  --color-bg: #0b0a08;
+  --color-bg-elevated: #141210;
+  --color-bg-overlay: #1a1815;
+  --color-fg: #f3efe7;
+  --color-fg-muted: #a5a096;
+  --color-fg-subtle: #6f6a60;
+  --color-border: #25221d;
+  --color-border-strong: #3a3530;
+
+  /* Single accent — terracotta. Used sparingly. */
+  --color-accent: #e05a32;
+  --color-accent-soft: #e05a3218;
+  --color-accent-fg: #f4ebe4;
+
+  /* Semantic */
+  --color-warning: #d9a441;
+  --color-warning-soft: #d9a44118;
+  --color-danger: #c8452a;
+  --color-danger-soft: #c8452a18;
+  --color-success: #6c8f5a;
+  --color-success-soft: #6c8f5a18;
+  --color-info: #7c8ea8;
+  --color-info-soft: #7c8ea818;
+
+  /* Radii — kept conservative. Editorial, not bubbly. */
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Light fallback for daytime use. Kept warm, paper-like. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --color-bg: #f7f3ea;
+    --color-bg-elevated: #ffffff;
+    --color-bg-overlay: #fefbf4;
+    --color-fg: #1a1815;
+    --color-fg-muted: #5f5a52;
+    --color-fg-subtle: #8f8a80;
+    --color-border: #e4ddcd;
+    --color-border-strong: #c9c0aa;
+    --color-accent: #c4451f;
+    --color-accent-soft: #c4451f14;
+    --color-accent-fg: #ffffff;
   }
 }
 
+/* Theme bridge — shadcn components reference these names. */
+@theme inline {
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-fg);
+  --color-card: var(--color-bg-elevated);
+  --color-card-foreground: var(--color-fg);
+  --color-popover: var(--color-bg-overlay);
+  --color-popover-foreground: var(--color-fg);
+  --color-primary: var(--color-fg);
+  --color-primary-foreground: var(--color-bg);
+  --color-secondary: var(--color-bg-elevated);
+  --color-secondary-foreground: var(--color-fg);
+  --color-muted: var(--color-bg-elevated);
+  --color-muted-foreground: var(--color-fg-muted);
+  --color-accent: var(--color-accent-soft);
+  --color-accent-foreground: var(--color-accent);
+  --color-destructive: var(--color-danger);
+  --color-border: var(--color-border);
+  --color-input: var(--color-border);
+  --color-ring: var(--color-accent);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-display);
+  --radius: var(--radius-md);
+}
+
+/* Base element resets with editorial feel. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  border-color: var(--color-border);
+}
+
+html {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  min-height: 100vh;
+  /* Subtle paper grain — barely perceptible, adds warmth */
+  background-image:
+    radial-gradient(
+      circle at 15% 10%,
+      rgba(224, 90, 50, 0.015) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 85% 90%,
+      rgba(224, 90, 50, 0.012) 0%,
+      transparent 40%
+    );
+}
+
+/* Selection */
+::selection {
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+/* Focus — sharp, not soft */
+:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Editorial serif — letterspacing, optical sizing */
+.font-serif {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+}
+
+/* Mono with tabular numerals for data alignment */
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rule — editorial hairline */
+.hr-editorial {
+  height: 1px;
+  background: var(--color-border);
+  border: 0;
+}
+
+/* Fade-in on page load — subtle, not distracting */
+@keyframes editorial-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: editorial-fade-in 0.5s cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.animate-fade-in-delayed {
+  animation: editorial-fade-in 0.6s cubic-bezier(0.2, 0, 0, 1) 0.1s both;
+}
+
+/* Tabular number utility */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }

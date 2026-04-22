@@ -1,19 +1,14 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { ArrowLeft, ExternalLink, Code2 } from "lucide-react"
+import { ArrowLeft, Code2, ExternalLink } from "lucide-react"
 
+import { PipelineTracker } from "@/components/pipeline-tracker"
 import { StageBadge } from "@/components/stage-badge"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
+import { TopNav } from "@/components/top-nav"
 import type { App, Profile } from "@/lib/db-types"
 import { MONETIZATION_LABELS, daysInStage, mvpTimerLevel } from "@/lib/stages"
 import { createClient } from "@/lib/supabase/server"
+import { cn } from "@/lib/utils"
 
 type AppDetail = App & {
   pm: Pick<Profile, "id" | "full_name" | "email"> | null
@@ -32,13 +27,18 @@ export default async function AppDetailPage({
   } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
-  const { data: app } = await supabase
-    .from("apps")
-    .select(
-      "*, pm:profiles!apps_pm_id_fkey(id, full_name, email)"
-    )
-    .eq("id", id)
-    .maybeSingle<AppDetail>()
+  const [{ data: profile }, { data: app }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name, email, role")
+      .eq("id", user.id)
+      .maybeSingle<Pick<Profile, "full_name" | "email" | "role">>(),
+    supabase
+      .from("apps")
+      .select("*, pm:profiles!apps_pm_id_fkey(id, full_name, email)")
+      .eq("id", id)
+      .maybeSingle<AppDetail>(),
+  ])
 
   if (!app) notFound()
 
@@ -46,141 +46,278 @@ export default async function AppDetailPage({
   const timerLevel =
     app.current_stage === "mvp" ? mvpTimerLevel(days) : "ok"
 
+  const created = new Date(app.created_at).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 p-8">
-      <div>
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/">
-            <ArrowLeft className="size-4" />
-            Back to dashboard
-          </Link>
-        </Button>
-      </div>
+    <div className="min-h-screen">
+      <TopNav profile={profile ?? null} fallbackEmail={user.email ?? ""} />
 
-      <header className="flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-semibold tracking-tight">
-            {app.name}
-          </h1>
-          <StageBadge stage={app.current_stage} />
-        </div>
-        <p className="text-muted-foreground">{app.value_hypothesis}</p>
-
-        {app.current_stage === "mvp" && timerLevel !== "ok" && (
-          <div
-            className={
-              timerLevel === "danger"
-                ? "rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200"
-                : "rounded-md bg-orange-50 p-3 text-sm text-orange-800 dark:bg-orange-950/40 dark:text-orange-200"
-            }
+      <main className="mx-auto w-full max-w-5xl px-6 py-10 lg:px-10">
+        {/* Back */}
+        <div className="mb-10">
+          <Link
+            href="/"
+            className="group inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-[color:var(--color-fg-muted)] transition hover:text-[color:var(--color-accent)]"
           >
-            {timerLevel === "danger"
-              ? `This app has been in MVP for ${days} days. Decide offline whether to promote or drop.`
-              : `This app has been in MVP for ${days} days. Time to decide on next steps.`}
-          </div>
-        )}
-      </header>
+            <ArrowLeft className="size-3 transition group-hover:-translate-x-1" />
+            Back to pipeline
+          </Link>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Overview</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-          <div>
-            <div className="text-xs uppercase text-muted-foreground">PM</div>
-            <div className="font-medium">
-              {app.pm?.full_name ?? app.pm?.email ?? "—"}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs uppercase text-muted-foreground">
-              Target user
-            </div>
-            <div className="font-medium">{app.target_user}</div>
-          </div>
-          <div>
-            <div className="text-xs uppercase text-muted-foreground">
-              Days in stage
-            </div>
-            <div className="font-medium">{days}</div>
-          </div>
-          <div>
-            <div className="text-xs uppercase text-muted-foreground">
-              Monetization
-            </div>
-            <div className="font-medium">
-              {app.monetization_model
-                ? MONETIZATION_LABELS[app.monetization_model]
-                : "Not set"}
-              {app.monetization_description ? (
-                <span className="font-normal text-muted-foreground">
-                  {" — "}
-                  {app.monetization_description}
+        {/* Article masthead */}
+        <article className="animate-fade-in space-y-10">
+          <header className="space-y-6">
+            {/* Eyebrow meta-strip */}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
+              <span>ID · {app.id.slice(0, 8)}</span>
+              <span>Filed · {created}</span>
+              <span>
+                Owner ·{" "}
+                <span className="text-[color:var(--color-fg-muted)]">
+                  {app.pm?.full_name ?? app.pm?.email ?? "—"}
                 </span>
-              ) : null}
+              </span>
             </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Links</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <div className="flex items-center gap-2">
-            <Code2 className="size-4 text-muted-foreground" />
-            <a
-              href={app.repo_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium underline-offset-4 hover:underline"
-            >
-              {app.repo_url}
-            </a>
-          </div>
-          {app.live_url ? (
-            <div className="flex items-center gap-2">
-              <ExternalLink className="size-4 text-muted-foreground" />
-              <a
-                href={app.live_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium underline-offset-4 hover:underline"
+            {/* Title */}
+            <h1 className="font-serif text-5xl leading-[1.05] tracking-tight text-[color:var(--color-fg)] sm:text-6xl">
+              {app.name}
+            </h1>
+
+            {/* Lead paragraph */}
+            <p className="max-w-3xl font-serif text-2xl leading-snug text-[color:var(--color-fg-muted)] italic">
+              {app.value_hypothesis}
+            </p>
+
+            {/* Stage row */}
+            <div className="flex flex-wrap items-center gap-4 border-y border-[color:var(--color-border)] py-4">
+              <StageBadge stage={app.current_stage} variant="prominent" />
+              <span
+                className={cn(
+                  "font-mono text-[11px] uppercase tracking-[0.2em]",
+                  timerLevel === "danger" &&
+                    "text-[color:var(--color-danger)]",
+                  timerLevel === "warning" &&
+                    "text-[color:var(--color-warning)]",
+                  timerLevel === "ok" &&
+                    "text-[color:var(--color-fg-muted)]"
+                )}
               >
-                {app.live_url}
-              </a>
+                {days}d in stage
+              </span>
             </div>
-          ) : (
-            <div className="text-muted-foreground">
-              No live URL yet — add one before moving to Ready for Mainnet.
+
+            {/* MVP warning when applicable */}
+            {app.current_stage === "mvp" && timerLevel !== "ok" && (
+              <div
+                className={cn(
+                  "border-l-2 bg-[color:var(--color-bg-elevated)] p-4",
+                  timerLevel === "danger"
+                    ? "border-[color:var(--color-danger)]"
+                    : "border-[color:var(--color-warning)]"
+                )}
+              >
+                <div
+                  className={cn(
+                    "font-mono text-[10px] uppercase tracking-[0.25em]",
+                    timerLevel === "danger"
+                      ? "text-[color:var(--color-danger)]"
+                      : "text-[color:var(--color-warning)]"
+                  )}
+                >
+                  {timerLevel === "danger"
+                    ? "Danger · 4+ weeks stale"
+                    : "Warning · 2+ weeks in MVP"}
+                </div>
+                <p className="mt-1 text-sm text-[color:var(--color-fg)]">
+                  {timerLevel === "danger"
+                    ? "This app has been in MVP for over a month. Decide offline whether to promote to Ready for Mainnet or drop it."
+                    : "Time to decide next steps — promote, iterate, or close."}
+                </p>
+              </div>
+            )}
+
+            {/* Pipeline tracker */}
+            <div className="pt-2">
+              <PipelineTracker current={app.current_stage} />
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </header>
 
-      {app.testing_instructions && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Testing instructions</CardTitle>
-          </CardHeader>
-          <CardContent className="whitespace-pre-wrap text-sm">
-            {app.testing_instructions}
-          </CardContent>
-        </Card>
-      )}
+          {/* Body sections — editorial layout with sidenote-style meta */}
+          <div className="grid gap-10 lg:grid-cols-[1fr_280px]">
+            <div className="space-y-10">
+              <Section title="Overview">
+                <dl className="grid gap-5 sm:grid-cols-2">
+                  <DefPair
+                    label="Target user"
+                    value={app.target_user}
+                  />
+                  <DefPair
+                    label="Monetization"
+                    value={
+                      app.monetization_model
+                        ? MONETIZATION_LABELS[app.monetization_model]
+                        : "Not set"
+                    }
+                    detail={app.monetization_description ?? undefined}
+                  />
+                </dl>
+              </Section>
 
-      <Separator />
+              <Section title="Links">
+                <ul className="space-y-3">
+                  <LinkRow
+                    icon={<Code2 className="size-4" />}
+                    label="Repo"
+                    href={app.repo_url}
+                  />
+                  {app.live_url ? (
+                    <LinkRow
+                      icon={<ExternalLink className="size-4" />}
+                      label="Live"
+                      href={app.live_url}
+                    />
+                  ) : (
+                    <li className="font-mono text-xs uppercase tracking-[0.18em] text-[color:var(--color-fg-subtle)]">
+                      No live URL yet · required before Ready for Mainnet
+                    </li>
+                  )}
+                </ul>
+              </Section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Next steps</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Approvals, feedback threads, and stage transitions will appear here
-          as we build out Ready for Mainnet.
-        </CardContent>
-      </Card>
-    </main>
+              {app.testing_instructions && (
+                <Section title="Testing instructions">
+                  <p className="whitespace-pre-wrap font-serif text-lg leading-relaxed text-[color:var(--color-fg)]">
+                    {app.testing_instructions}
+                  </p>
+                </Section>
+              )}
+
+              <Section title="Next steps">
+                <p className="text-sm text-[color:var(--color-fg-muted)]">
+                  Approvals, feedback threads, and stage transitions will
+                  appear here as we build Ready for Mainnet.
+                </p>
+              </Section>
+            </div>
+
+            {/* Sidenote */}
+            <aside className="hidden lg:block">
+              <div className="sticky top-24 space-y-6 border-l border-[color:var(--color-border)] pl-6">
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
+                    Created
+                  </div>
+                  <div className="font-serif text-2xl text-[color:var(--color-fg)]">
+                    {created}
+                  </div>
+                </div>
+                <hr className="hr-editorial" />
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
+                    Stage
+                  </div>
+                  <div className="pt-1">
+                    <StageBadge stage={app.current_stage} />
+                  </div>
+                </div>
+                <hr className="hr-editorial" />
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
+                    Days in stage
+                  </div>
+                  <div className="font-serif text-2xl tabular-nums text-[color:var(--color-fg)]">
+                    {days}
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </article>
+      </main>
+    </div>
+  )
+}
+
+/* ------------------------------- components ------------------------------- */
+
+function Section({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="space-y-5">
+      <div className="flex items-baseline gap-4 border-b border-[color:var(--color-border)] pb-2">
+        <h2 className="font-serif text-2xl text-[color:var(--color-fg)]">
+          {title}
+        </h2>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function DefPair({
+  label,
+  value,
+  detail,
+}: {
+  label: string
+  value: string
+  detail?: string
+}) {
+  return (
+    <div className="space-y-1">
+      <dt className="font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
+        {label}
+      </dt>
+      <dd className="text-base text-[color:var(--color-fg)]">
+        {value}
+        {detail && (
+          <span className="block text-sm text-[color:var(--color-fg-muted)]">
+            {detail}
+          </span>
+        )}
+      </dd>
+    </div>
+  )
+}
+
+function LinkRow({
+  icon,
+  label,
+  href,
+}: {
+  icon: React.ReactNode
+  label: string
+  href: string
+}) {
+  return (
+    <li>
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group flex items-center gap-3 border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] px-4 py-3 transition hover:border-[color:var(--color-accent)]"
+      >
+        <span className="text-[color:var(--color-fg-muted)] group-hover:text-[color:var(--color-accent)]">
+          {icon}
+        </span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
+          {label}
+        </span>
+        <span className="flex-1 truncate text-sm text-[color:var(--color-fg)]">
+          {href}
+        </span>
+        <ExternalLink className="size-3.5 text-[color:var(--color-fg-subtle)] transition group-hover:translate-x-0.5 group-hover:text-[color:var(--color-accent)]" />
+      </a>
+    </li>
   )
 }
