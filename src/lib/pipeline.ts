@@ -8,43 +8,116 @@ import type { App, AppStage, Profile } from "./db-types"
 
 export type BlockerSeverity = "idle" | "watching" | "warning" | "blocked"
 
+/**
+ * Visible countdown attached to an app's current stage. Rendered in the
+ * landing table and the detail header so every viewer understands what the
+ * deadline is for.
+ *
+ *  - "build"  — from first day in MVP until entering Ready for Mainnet.
+ *               10-day budget. Warning at 7d, overdue at 10d.
+ *  - "review" — 48 business hours in Ready for Mainnet for Gustavo & Joaquín
+ *               to approve. Warning at 36h, overdue at 48h.
+ */
+export type Timer = {
+  kind: "build" | "review"
+  label: string
+  elapsed: number
+  budget: number
+  unit: "days" | "hours"
+  severity: BlockerSeverity
+  /** Positive if time left, negative if overdue. */
+  remaining: number
+}
+
 export type AppStatus = {
   severity: BlockerSeverity
   daysInStage: number
   reason: string
   blockers: string[]
+  timer: Timer | null
 }
 
-type StatusInput = Pick<App, "current_stage" | "stage_entered_at"> & {
+type StatusInput = Pick<
+  App,
+  "current_stage" | "stage_entered_at" | "created_at"
+> & {
   pm: Pick<Profile, "full_name" | "email"> | null
 }
 
+const BUILD_BUDGET_DAYS = 10
+const BUILD_WARN_DAYS = 7
+const REVIEW_BUDGET_HOURS = 48
+const REVIEW_WARN_HOURS = 36
+
 export function computeAppStatus(app: StatusInput): AppStatus {
   const now = new Date()
-  const entered = new Date(app.stage_entered_at)
-  const days = daysBetween(entered, now)
+  const enteredStage = new Date(app.stage_entered_at)
+  const created = new Date(app.created_at ?? app.stage_entered_at)
+  const days = daysBetween(enteredStage, now)
 
   switch (app.current_stage) {
-    case "ready_for_mainnet": {
-      const businessHours = businessHoursBetween(entered, now)
-      if (businessHours >= 48) {
-        return {
-          severity: "blocked",
-          daysInStage: days,
-          reason: "48h approval window expired",
-          blockers: ["CTO", "COO", "Legal Lead"],
-        }
-      }
+    case "mvp":
+    case "refining": {
+      // 10-day build window runs continuously from app creation
+      const buildDays = daysBetween(created, now)
+      const timerSev: BlockerSeverity =
+        buildDays >= BUILD_BUDGET_DAYS
+          ? "blocked"
+          : buildDays >= BUILD_WARN_DAYS
+            ? "warning"
+            : "watching"
       return {
-        severity: "warning",
+        severity: timerSev,
         daysInStage: days,
-        reason: "Awaiting approvals",
-        blockers: ["CTO", "COO", "Legal Lead"],
+        reason:
+          timerSev === "blocked"
+            ? "Build window expired (10d)"
+            : timerSev === "warning"
+              ? "Build window closing (>7d)"
+              : STAGE_REASON[app.current_stage],
+        blockers: timerSev === "blocked" ? ["Owner / PM"] : [],
+        timer: {
+          kind: "build",
+          label: "Build window",
+          elapsed: buildDays,
+          budget: BUILD_BUDGET_DAYS,
+          unit: "days",
+          severity: timerSev,
+          remaining: BUILD_BUDGET_DAYS - buildDays,
+        },
       }
     }
 
-    case "mvp":
-    case "refining":
+    case "ready_for_mainnet": {
+      const businessHours = businessHoursBetween(enteredStage, now)
+      const timerSev: BlockerSeverity =
+        businessHours >= REVIEW_BUDGET_HOURS
+          ? "blocked"
+          : businessHours >= REVIEW_WARN_HOURS
+            ? "warning"
+            : "watching"
+      return {
+        severity: timerSev,
+        daysInStage: days,
+        reason:
+          timerSev === "blocked"
+            ? "48h review window expired"
+            : timerSev === "warning"
+              ? "Review window closing (<12h)"
+              : "Awaiting approvals",
+        blockers: ["CTO", "COO"],
+        timer: {
+          kind: "review",
+          label: "Review window",
+          elapsed: businessHours,
+          budget: REVIEW_BUDGET_HOURS,
+          unit: "hours",
+          severity: timerSev,
+          remaining: REVIEW_BUDGET_HOURS - businessHours,
+        },
+      }
+    }
+
     case "monetization_setup":
     case "launched":
     case "review":
@@ -53,6 +126,7 @@ export function computeAppStatus(app: StatusInput): AppStatus {
         daysInStage: days,
         reason: STAGE_REASON[app.current_stage],
         blockers: [],
+        timer: null,
       }
 
     case "active":
@@ -63,6 +137,7 @@ export function computeAppStatus(app: StatusInput): AppStatus {
         daysInStage: days,
         reason: STAGE_REASON[app.current_stage],
         blockers: [],
+        timer: null,
       }
   }
 }

@@ -11,6 +11,7 @@ import { PhaseActionCard } from "@/components/phase-action-card"
 import { PhaseProgress } from "@/components/phase-progress"
 import { SeverityDot } from "@/components/severity-dot"
 import { StageBadge } from "@/components/stage-badge"
+import { TimerBadge } from "@/components/timer-badge"
 import { TopNav } from "@/components/top-nav"
 import type { App, Profile } from "@/lib/db-types"
 import type {
@@ -165,6 +166,12 @@ export default async function AppDetailPage({
               </span>
             </div>
           </div>
+
+          {progress.timer && (
+            <div className="mt-5">
+              <TimerBadge timer={progress.timer} variant="full" />
+            </div>
+          )}
 
           <div className="mt-5">
             <PhaseProgress progress={progress} />

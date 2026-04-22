@@ -7,6 +7,7 @@ import { ChevronRight, ArrowUpRight } from "lucide-react"
 import { PhaseChecksGrid } from "@/components/phase-checks-grid"
 import { PhaseProgress } from "@/components/phase-progress"
 import { SeverityDot } from "@/components/severity-dot"
+import { TimerBadge } from "@/components/timer-badge"
 import type { BlockerSeverity } from "@/lib/pipeline"
 import type { AppProgress } from "@/lib/progress"
 import { cn } from "@/lib/utils"
@@ -19,7 +20,7 @@ export type PipelineRow = {
   progress: AppProgress
 }
 
-const COLUMN_WIDTHS = "18rem minmax(0, 1fr) 9rem 5rem 3rem"
+const COLUMN_WIDTHS = "16rem minmax(0, 1fr) 8rem 9rem 3rem"
 
 export function PipelineTable({ rows }: { rows: PipelineRow[] }) {
   const [sev, setSev] = useState<"all" | BlockerSeverity>("all")
@@ -94,7 +95,7 @@ export function PipelineTable({ rows }: { rows: PipelineRow[] }) {
             <span>MKT Basic</span>
           </div>
           <div>Owner</div>
-          <div className="text-right">Days</div>
+          <div className="text-right">Timer</div>
           <div aria-hidden />
         </div>
 
@@ -182,16 +183,20 @@ function RowItem({
           {row.pm_name || "—"}
         </div>
 
-        {/* 4 · Days in stage */}
-        <div
-          className={cn(
-            "text-right font-mono text-sm tabular-nums",
-            row.progress.severity === "blocked"
-              ? "text-[color:var(--color-danger)]"
-              : "text-[color:var(--color-fg-muted)]"
+        {/* 4 · Timer or days in stage */}
+        <div className="flex items-center justify-end">
+          {row.progress.timer ? (
+            <TimerBadge timer={row.progress.timer} variant="compact" />
+          ) : (
+            <span
+              className={cn(
+                "font-mono text-sm tabular-nums",
+                "text-[color:var(--color-fg-muted)]"
+              )}
+            >
+              {row.days_in_stage}d
+            </span>
           )}
-        >
-          {row.days_in_stage}d
         </div>
 
         {/* 5 · Expand toggle */}

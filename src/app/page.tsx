@@ -21,6 +21,7 @@ type DashboardApp = Pick<
   | "name"
   | "current_stage"
   | "stage_entered_at"
+  | "created_at"
   | "monetization_setup_complete"
   | "owner_tested_at"
 > & {
@@ -45,7 +46,7 @@ export default async function DashboardPage() {
     supabase
       .from("apps")
       .select(
-        `id, name, current_stage, stage_entered_at, monetization_setup_complete, owner_tested_at,
+        `id, name, current_stage, stage_entered_at, created_at, monetization_setup_complete, owner_tested_at,
          pm:profiles!apps_pm_id_fkey(full_name, email),
          approvals(approver_role, status),
          marketing_checklist(id, app_id, promoted_tweet, proving_ground_article, video, completed_at)`

@@ -45,6 +45,7 @@ export type AppProgress = {
   daysInStage: number
   currentPhase: PhaseKey | "review" | "terminal"
   phases: Phase[]
+  timer: import("./pipeline").Timer | null
 }
 
 /** Order used to compare "past" vs "future" vs "current" phase. */
@@ -65,6 +66,7 @@ export function computeAppProgress(input: {
     App,
     | "current_stage"
     | "stage_entered_at"
+    | "created_at"
     | "monetization_setup_complete"
     | "owner_tested_at"
   >
@@ -75,6 +77,7 @@ export function computeAppProgress(input: {
   const status = computeAppStatus({
     current_stage: input.app.current_stage,
     stage_entered_at: input.app.stage_entered_at,
+    created_at: input.app.created_at,
     pm: input.pmName ? { full_name: input.pmName, email: "" } : null,
   })
 
@@ -227,6 +230,7 @@ export function computeAppProgress(input: {
     daysInStage: status.daysInStage,
     currentPhase,
     phases: [mvpPhase, refiningPhase, rfmPhase, launchedPhase, mktPhase],
+    timer: status.timer,
   }
 }
 
