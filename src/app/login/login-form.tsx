@@ -7,15 +7,15 @@ import { sendMagicLink, type LoginState } from "./actions"
 
 const initialState: LoginState = { status: "idle" }
 
-function SubmitButton({ disabled }: { disabled?: boolean }) {
+function SubmitButton() {
   const { pending } = useFormStatus()
   return (
     <button
       type="submit"
-      disabled={pending || disabled}
+      disabled={pending}
       className="group relative flex w-full items-center justify-between gap-3 border border-[color:var(--color-fg)] bg-[color:var(--color-fg)] px-4 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-[color:var(--color-bg)] transition hover:bg-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent-fg)] disabled:opacity-50"
     >
-      <span>{pending ? "Sending..." : "Send magic link"}</span>
+      <span>{pending ? "Sending\u2026" : "Send magic link"}</span>
       <ArrowRight className="size-4 transition group-hover:translate-x-1" />
     </button>
   )

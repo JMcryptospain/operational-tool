@@ -73,7 +73,9 @@ export default async function AppDetailPage({
           <header className="space-y-6">
             {/* Eyebrow meta-strip */}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
-              <span>ID · {app.id.slice(0, 8)}</span>
+              <span translate="no">
+                ID · <span className="font-mono">{app.id.slice(0, 8)}</span>
+              </span>
               <span>Filed · {created}</span>
               <span>
                 Owner ·{" "}

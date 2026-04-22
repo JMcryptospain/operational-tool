@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
@@ -26,6 +26,14 @@ const instrumentSerif = Instrument_Serif({
 export const metadata: Metadata = {
   title: "Taiko Launchpad",
   description: "Internal launch pipeline for Taiko apps",
+}
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0b0a08" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f3ea" },
+  ],
+  colorScheme: "dark",
 }
 
 export default function RootLayout({

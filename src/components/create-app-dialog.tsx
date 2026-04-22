@@ -25,7 +25,7 @@ function SubmitButton() {
       disabled={pending}
       className="group flex items-center justify-between gap-3 border border-[color:var(--color-fg)] bg-[color:var(--color-fg)] px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-[color:var(--color-bg)] transition hover:border-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)] hover:text-[color:var(--color-accent-fg)] disabled:opacity-50"
     >
-      <span>{pending ? "Submitting..." : "Submit as MVP"}</span>
+      <span>{pending ? "Submitting\u2026" : "Submit as MVP"}</span>
       <ArrowRight className="size-4 transition group-hover:translate-x-1" />
     </button>
   )
@@ -119,6 +119,7 @@ export function CreateAppDialog() {
               id="name"
               name="name"
               required
+              autoComplete="off"
               className={inputClass}
               placeholder="e.g. Taiko Inspector"
             />
@@ -154,7 +155,10 @@ export function CreateAppDialog() {
                 id="repo_url"
                 name="repo_url"
                 type="url"
-                placeholder="https://github.com/..."
+                inputMode="url"
+                autoComplete="url"
+                spellCheck={false}
+                placeholder="https://github.com/…"
                 required
                 className={inputClass}
               />
@@ -165,7 +169,10 @@ export function CreateAppDialog() {
                 id="live_url"
                 name="live_url"
                 type="url"
-                placeholder="https://..."
+                inputMode="url"
+                autoComplete="url"
+                spellCheck={false}
+                placeholder="https://…"
                 className={inputClass}
               />
             </Field>

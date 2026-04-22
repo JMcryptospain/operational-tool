@@ -235,7 +235,7 @@ function AppRow({ app }: { app: AppListItem }) {
       {/* col 1-6 · name + hypothesis */}
       <div className="col-span-12 min-w-0 space-y-1.5 md:col-span-6">
         <div className="flex items-baseline gap-3">
-          <h3 className="font-serif text-xl text-[color:var(--color-fg)] group-hover:text-[color:var(--color-accent)]">
+          <h3 className="truncate font-serif text-xl text-[color:var(--color-fg)] group-hover:text-[color:var(--color-accent)]">
             {app.name}
           </h3>
           <ArrowUpRight className="size-4 shrink-0 translate-x-0 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" />

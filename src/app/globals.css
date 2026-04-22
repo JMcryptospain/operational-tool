@@ -99,11 +99,31 @@
 html {
   background: var(--color-bg);
   color: var(--color-fg);
+  color-scheme: dark;
   font-family: var(--font-sans);
   font-feature-settings: "ss01", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+@media (prefers-color-scheme: light) {
+  html:not([data-theme="dark"]) {
+    color-scheme: light;
+  }
+}
+
+/* Native form controls — keep the dark aesthetic consistent */
+select,
+option {
+  background-color: var(--color-bg-elevated);
+  color: var(--color-fg);
+}
+
+/* Editorial display headings — let the browser balance long serif titles */
+h1,
+h2 {
+  text-wrap: balance;
 }
 
 body {
@@ -174,6 +194,17 @@ body {
 
 .animate-fade-in-delayed {
   animation: editorial-fade-in 0.6s cubic-bezier(0.2, 0, 0, 1) 0.1s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Tabular number utility */
