@@ -3,6 +3,10 @@ import { notFound, redirect } from "next/navigation"
 import { ArrowLeft, ExternalLink, Code2 } from "lucide-react"
 
 import { reconcileAppStage } from "@/app/apps/[id]/actions"
+import {
+  CommentsThread,
+  type CommentNode,
+} from "@/components/comments-thread"
 import { PhaseActionCard } from "@/components/phase-action-card"
 import { PhaseProgress } from "@/components/phase-progress"
 import { SeverityDot } from "@/components/severity-dot"
@@ -40,23 +44,48 @@ export default async function AppDetailPage({
   // by actions that happened before this logic existed.
   await reconcileAppStage(id)
 
-  const [{ data: profile }, { data: app }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, full_name, email, role")
-      .eq("id", user.id)
-      .maybeSingle<Pick<Profile, "id" | "full_name" | "email" | "role">>(),
-    supabase
-      .from("apps")
-      .select(
-        `*,
+  const [{ data: profile }, { data: app }, { data: commentsRaw }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, full_name, email, role")
+        .eq("id", user.id)
+        .maybeSingle<Pick<Profile, "id" | "full_name" | "email" | "role">>(),
+      supabase
+        .from("apps")
+        .select(
+          `*,
          pm:profiles!apps_pm_id_fkey(id, full_name, email),
          approvals(approver_role, status),
          marketing_checklist(id, app_id, promoted_tweet, proving_ground_article, video, completed_at)`
-      )
-      .eq("id", id)
-      .maybeSingle<AppDetail>(),
-  ])
+        )
+        .eq("id", id)
+        .maybeSingle<AppDetail>(),
+      supabase
+        .from("comments")
+        .select(
+          `id, body, created_at, parent_comment_id,
+           author:profiles!comments_author_id_fkey(id, full_name, email, role)`
+        )
+        .eq("app_id", id)
+        .order("created_at", { ascending: true })
+        .returns<
+          Array<{
+            id: string
+            body: string
+            created_at: string
+            parent_comment_id: string | null
+            author: {
+              id: string
+              full_name: string | null
+              email: string
+              role: string
+            } | null
+          }>
+        >(),
+    ])
+
+  const commentTree = buildCommentTree(commentsRaw ?? [])
 
   if (!app) notFound()
 
@@ -194,6 +223,15 @@ export default async function AppDetailPage({
             />
           ))}
         </div>
+
+        {/* Feedback & discussion */}
+        <div className="mt-8">
+          <CommentsThread
+            appId={app.id}
+            comments={commentTree}
+            currentUserId={user.id}
+          />
+        </div>
       </main>
     </div>
   )
@@ -210,4 +248,34 @@ function DL({ label, value }: { label: string; value: string }) {
       </dd>
     </div>
   )
+}
+
+function buildCommentTree(
+  flat: Array<{
+    id: string
+    body: string
+    created_at: string
+    parent_comment_id: string | null
+    author: {
+      id: string
+      full_name: string | null
+      email: string
+      role: string
+    } | null
+  }>
+): CommentNode[] {
+  const byId = new Map<string, CommentNode>()
+  for (const c of flat) {
+    byId.set(c.id, { ...c, children: [] })
+  }
+  const roots: CommentNode[] = []
+  for (const c of flat) {
+    const node = byId.get(c.id)!
+    if (c.parent_comment_id && byId.has(c.parent_comment_id)) {
+      byId.get(c.parent_comment_id)!.children.push(node)
+    } else {
+      roots.push(node)
+    }
+  }
+  return roots
 }
