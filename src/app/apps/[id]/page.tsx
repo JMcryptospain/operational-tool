@@ -1,19 +1,25 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { ArrowLeft, Code2, ExternalLink } from "lucide-react"
+import { ArrowLeft, ExternalLink, Code2 } from "lucide-react"
 
-import { PipelineTracker } from "@/components/pipeline-tracker"
+import { PhaseActionCard } from "@/components/phase-action-card"
+import { PhaseProgress } from "@/components/phase-progress"
 import { SeverityDot } from "@/components/severity-dot"
 import { StageBadge } from "@/components/stage-badge"
 import { TopNav } from "@/components/top-nav"
 import type { App, Profile } from "@/lib/db-types"
-import { computeAppStatus } from "@/lib/pipeline"
-import { MONETIZATION_LABELS } from "@/lib/stages"
+import type {
+  ApprovalRow,
+  MarketingChecklist,
+} from "@/lib/db-types-extra"
+import { computeAppProgress } from "@/lib/progress"
+import { MONETIZATION_LABELS, STAGE_LABELS } from "@/lib/stages"
 import { createClient } from "@/lib/supabase/server"
-import { cn } from "@/lib/utils"
 
 type AppDetail = App & {
   pm: Pick<Profile, "id" | "full_name" | "email"> | null
+  approvals: ApprovalRow[]
+  marketing_checklist: MarketingChecklist[]
 }
 
 export default async function AppDetailPage({
@@ -32,23 +38,39 @@ export default async function AppDetailPage({
   const [{ data: profile }, { data: app }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, email, role")
+      .select("id, full_name, email, role")
       .eq("id", user.id)
-      .maybeSingle<Pick<Profile, "full_name" | "email" | "role">>(),
+      .maybeSingle<Pick<Profile, "id" | "full_name" | "email" | "role">>(),
     supabase
       .from("apps")
-      .select("*, pm:profiles!apps_pm_id_fkey(id, full_name, email)")
+      .select(
+        `*,
+         pm:profiles!apps_pm_id_fkey(id, full_name, email),
+         approvals(approver_role, status),
+         marketing_checklist(id, app_id, promoted_tweet, proving_ground_article, video, completed_at)`
+      )
       .eq("id", id)
       .maybeSingle<AppDetail>(),
   ])
 
   if (!app) notFound()
 
-  const status = computeAppStatus({
-    current_stage: app.current_stage,
-    stage_entered_at: app.stage_entered_at,
-    pm: app.pm,
+  const progress = computeAppProgress({
+    app,
+    approvals: app.approvals ?? [],
+    marketing: app.marketing_checklist?.[0] ?? null,
+    pmName: app.pm?.full_name ?? null,
   })
+
+  const actor = {
+    isOwner: profile?.id === app.pm?.id,
+    isCTO: profile?.role === "cto",
+    isCOO: profile?.role === "coo",
+    isLegal: profile?.role === "legal_lead",
+    isMarketing: profile?.role === "marketing_lead",
+    isCofounder: profile?.role === "cofounder",
+    isAdmin: profile?.role === "admin",
+  }
 
   const created = new Date(app.created_at).toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -57,272 +79,130 @@ export default async function AppDetailPage({
   })
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[color:var(--color-bg-subtle)]">
       <TopNav profile={profile ?? null} fallbackEmail={user.email ?? ""} />
 
-      <main className="mx-auto w-full max-w-5xl px-6 py-10 lg:px-10">
-        {/* Back */}
-        <div className="mb-10">
+      <main className="mx-auto w-full max-w-6xl px-6 py-6 lg:px-10">
+        <div className="mb-5">
           <Link
             href="/"
-            className="group inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-[color:var(--color-fg-muted)] transition hover:text-[color:var(--color-accent)]"
+            className="inline-flex items-center gap-1.5 text-xs text-[color:var(--color-fg-muted)] hover:text-[color:var(--color-accent)]"
           >
-            <ArrowLeft className="size-3 transition group-hover:-translate-x-1" />
+            <ArrowLeft className="size-3.5" />
             Back to pipeline
           </Link>
         </div>
 
-        {/* Article masthead */}
-        <article className="animate-fade-in space-y-10">
-          <header className="space-y-6">
-            {/* Eyebrow meta-strip */}
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
-              <span translate="no">
-                ID · <span className="font-mono">{app.id.slice(0, 8)}</span>
-              </span>
-              <span>Filed · {created}</span>
-              <span>
-                Owner ·{" "}
-                <span className="text-[color:var(--color-fg-muted)]">
-                  {app.pm?.full_name ?? app.pm?.email ?? "—"}
-                </span>
-              </span>
-            </div>
-
-            {/* Title */}
-            <h1 className="font-serif text-5xl leading-[1.05] tracking-tight text-[color:var(--color-fg)] sm:text-6xl">
-              {app.name}
-            </h1>
-
-            {/* Lead paragraph */}
-            <p className="max-w-3xl font-serif text-2xl leading-snug text-[color:var(--color-fg-muted)] italic">
-              {app.value_hypothesis}
-            </p>
-
-            {/* Stage row */}
-            <div className="flex flex-wrap items-center gap-4 border-y border-[color:var(--color-border)] py-4">
-              <StageBadge stage={app.current_stage} variant="prominent" />
-              <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-[color:var(--color-fg-muted)]">
-                <SeverityDot severity={status.severity} />
-                {status.daysInStage}d in stage
-              </span>
-              {status.blockers.length > 0 && (
-                <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[color:var(--color-fg-subtle)]">
-                  Waiting on{" "}
-                  <span className="text-[color:var(--color-fg)]">
-                    {status.blockers.join(", ")}
-                  </span>
-                </span>
-              )}
-            </div>
-
-            {/* Status banner when not idle */}
-            {(status.severity === "warning" ||
-              status.severity === "blocked") && (
-              <div
-                className={cn(
-                  "border-l-2 bg-[color:var(--color-bg-elevated)] p-4",
-                  status.severity === "blocked"
-                    ? "border-[color:var(--color-danger)]"
-                    : "border-[color:var(--color-warning)]"
-                )}
-              >
-                <div
-                  className={cn(
-                    "font-mono text-[10px] uppercase tracking-[0.25em]",
-                    status.severity === "blocked"
-                      ? "text-[color:var(--color-danger)]"
-                      : "text-[color:var(--color-warning)]"
-                  )}
-                >
-                  {status.severity === "blocked" ? "Blocked" : "Warning"}
-                </div>
-                <p className="mt-1 text-sm text-[color:var(--color-fg)]">
-                  {status.reason}
-                  {status.blockers.length > 0 && (
-                    <>
-                      . Action expected from{" "}
-                      <span className="font-medium">
-                        {status.blockers.join(", ")}
-                      </span>
-                      .
-                    </>
-                  )}
-                </p>
+        {/* Header */}
+        <header className="mb-6 rounded-lg border border-[color:var(--color-border)] bg-white p-6">
+          <div className="flex items-start justify-between gap-6">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-2xl font-semibold text-[color:var(--color-fg)]">
+                  {app.name}
+                </h1>
+                <StageBadge stage={app.current_stage} />
               </div>
-            )}
-
-            {/* Pipeline tracker */}
-            <div className="pt-2">
-              <PipelineTracker current={app.current_stage} />
-            </div>
-          </header>
-
-          {/* Body sections — editorial layout with sidenote-style meta */}
-          <div className="grid gap-10 lg:grid-cols-[1fr_280px]">
-            <div className="space-y-10">
-              <Section title="Overview">
-                <dl className="grid gap-5 sm:grid-cols-2">
-                  <DefPair
-                    label="Target user"
-                    value={app.target_user}
-                  />
-                  <DefPair
-                    label="Monetization"
-                    value={
-                      app.monetization_model
-                        ? MONETIZATION_LABELS[app.monetization_model]
-                        : "Not set"
-                    }
-                    detail={app.monetization_description ?? undefined}
-                  />
-                </dl>
-              </Section>
-
-              <Section title="Links">
-                <ul className="space-y-3">
-                  <LinkRow
-                    icon={<Code2 className="size-4" />}
-                    label="Repo"
-                    href={app.repo_url}
-                  />
-                  {app.live_url ? (
-                    <LinkRow
-                      icon={<ExternalLink className="size-4" />}
-                      label="Live"
-                      href={app.live_url}
-                    />
-                  ) : (
-                    <li className="font-mono text-xs uppercase tracking-[0.18em] text-[color:var(--color-fg-subtle)]">
-                      No live URL yet · required before Ready for Mainnet
-                    </li>
-                  )}
-                </ul>
-              </Section>
-
-              {app.testing_instructions && (
-                <Section title="Testing instructions">
-                  <p className="whitespace-pre-wrap font-serif text-lg leading-relaxed text-[color:var(--color-fg)]">
-                    {app.testing_instructions}
-                  </p>
-                </Section>
-              )}
-
+              <p className="mt-2 max-w-3xl text-sm text-[color:var(--color-fg-muted)]">
+                {app.value_hypothesis}
+              </p>
+              <dl className="mt-4 grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
+                <DL
+                  label="Owner"
+                  value={app.pm?.full_name ?? app.pm?.email ?? "—"}
+                />
+                <DL label="Target user" value={app.target_user} />
+                <DL
+                  label="Monetization"
+                  value={
+                    app.monetization_model
+                      ? MONETIZATION_LABELS[app.monetization_model]
+                      : "Not set"
+                  }
+                />
+                <DL label="Created" value={created} />
+              </dl>
             </div>
 
-            {/* Sidenote */}
-            <aside className="hidden lg:block">
-              <div className="sticky top-24 space-y-6 border-l border-[color:var(--color-border)] pl-6">
-                <div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
-                    Created
-                  </div>
-                  <div className="font-serif text-2xl text-[color:var(--color-fg)]">
-                    {created}
-                  </div>
-                </div>
-                <hr className="hr-editorial" />
-                <div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
-                    Stage
-                  </div>
-                  <div className="pt-1">
-                    <StageBadge stage={app.current_stage} />
-                  </div>
-                </div>
-                <hr className="hr-editorial" />
-                <div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
-                    Days in stage
-                  </div>
-                  <div className="font-serif text-2xl tabular-nums text-[color:var(--color-fg)]">
-                    {status.daysInStage}
-                  </div>
-                </div>
-              </div>
-            </aside>
+            <div className="flex shrink-0 items-center gap-2">
+              <SeverityDot severity={progress.severity} />
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[color:var(--color-fg-muted)]">
+                {progress.daysInStage}d in {STAGE_LABELS[app.current_stage]}
+              </span>
+            </div>
           </div>
-        </article>
+
+          <div className="mt-5">
+            <PhaseProgress progress={progress} />
+            <div className="mt-1 grid grid-cols-5 gap-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[color:var(--color-fg-subtle)]">
+              {progress.phases.map((p) => (
+                <span key={p.key} className="truncate">
+                  {p.label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-[color:var(--color-border)] pt-4 text-sm">
+            <a
+              href={app.repo_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-[color:var(--color-fg-muted)] hover:text-[color:var(--color-accent)]"
+            >
+              <Code2 className="size-3.5" /> Repo
+              <ExternalLink className="size-3" />
+            </a>
+            {app.live_url && (
+              <a
+                href={app.live_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-[color:var(--color-fg-muted)] hover:text-[color:var(--color-accent)]"
+              >
+                Live <ExternalLink className="size-3" />
+              </a>
+            )}
+          </div>
+
+          {app.testing_instructions && (
+            <div className="mt-4 rounded border border-[color:var(--color-border)] bg-[color:var(--color-bg-subtle)] p-3">
+              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[color:var(--color-fg-subtle)]">
+                Testing instructions
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-[color:var(--color-fg)]">
+                {app.testing_instructions}
+              </p>
+            </div>
+          )}
+        </header>
+
+        {/* Phase cards */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          {progress.phases.map((phase) => (
+            <PhaseActionCard
+              key={phase.key}
+              appId={app.id}
+              currentStage={app.current_stage}
+              phase={phase}
+              actor={actor}
+            />
+          ))}
+        </div>
       </main>
     </div>
   )
 }
 
-/* ------------------------------- components ------------------------------- */
-
-function Section({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
+function DL({ label, value }: { label: string; value: string }) {
   return (
-    <section className="space-y-5">
-      <div className="flex items-baseline gap-4 border-b border-[color:var(--color-border)] pb-2">
-        <h2 className="font-serif text-2xl text-[color:var(--color-fg)]">
-          {title}
-        </h2>
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function DefPair({
-  label,
-  value,
-  detail,
-}: {
-  label: string
-  value: string
-  detail?: string
-}) {
-  return (
-    <div className="space-y-1">
-      <dt className="font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
+    <div>
+      <dt className="font-mono text-[9px] uppercase tracking-[0.2em] text-[color:var(--color-fg-subtle)]">
         {label}
       </dt>
-      <dd className="text-base text-[color:var(--color-fg)]">
+      <dd className="mt-0.5 truncate text-sm text-[color:var(--color-fg)]">
         {value}
-        {detail && (
-          <span className="block text-sm text-[color:var(--color-fg-muted)]">
-            {detail}
-          </span>
-        )}
       </dd>
     </div>
-  )
-}
-
-function LinkRow({
-  icon,
-  label,
-  href,
-}: {
-  icon: React.ReactNode
-  label: string
-  href: string
-}) {
-  return (
-    <li>
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="group flex items-center gap-3 border border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] px-4 py-3 transition hover:border-[color:var(--color-accent)]"
-      >
-        <span className="text-[color:var(--color-fg-muted)] group-hover:text-[color:var(--color-accent)]">
-          {icon}
-        </span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
-          {label}
-        </span>
-        <span className="flex-1 truncate text-sm text-[color:var(--color-fg)]">
-          {href}
-        </span>
-        <ExternalLink className="size-3.5 text-[color:var(--color-fg-subtle)] transition group-hover:translate-x-0.5 group-hover:text-[color:var(--color-accent)]" />
-      </a>
-    </li>
   )
 }
