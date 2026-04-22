@@ -14,30 +14,32 @@
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Consolas,
     monospace;
 
-  /* Warm-dark palette (default) */
-  --color-bg: #0b0a08;
-  --color-bg-elevated: #141210;
-  --color-bg-overlay: #1a1815;
-  --color-fg: #f3efe7;
-  --color-fg-muted: #a5a096;
-  --color-fg-subtle: #6f6a60;
-  --color-border: #25221d;
-  --color-border-strong: #3a3530;
+  /* Dark palette — neutral near-black so the Taiko pink carries all the heat. */
+  --color-bg: #0a0a0b;
+  --color-bg-elevated: #121214;
+  --color-bg-overlay: #17171a;
+  --color-fg: #f2f0ee;
+  --color-fg-muted: #9b9a97;
+  --color-fg-subtle: #64635f;
+  --color-border: #22222a;
+  --color-border-strong: #34343e;
 
-  /* Single accent — terracotta. Used sparingly. */
-  --color-accent: #e05a32;
-  --color-accent-soft: #e05a3218;
-  --color-accent-fg: #f4ebe4;
+  /* Taiko brand accent — #E81899 magenta. Use with restraint. */
+  --color-accent: #e81899;
+  --color-accent-soft: #e8189918;
+  --color-accent-strong: #ff2aa6;
+  --color-accent-fg: #ffffff;
+  --color-accent-tint: #ffc5e9;
 
-  /* Semantic */
-  --color-warning: #d9a441;
-  --color-warning-soft: #d9a44118;
-  --color-danger: #c8452a;
-  --color-danger-soft: #c8452a18;
-  --color-success: #6c8f5a;
-  --color-success-soft: #6c8f5a18;
-  --color-info: #7c8ea8;
-  --color-info-soft: #7c8ea818;
+  /* Semantic — tuned to sit beside the brand pink */
+  --color-warning: #f0b23c;
+  --color-warning-soft: #f0b23c18;
+  --color-danger: #ef4444;
+  --color-danger-soft: #ef444418;
+  --color-success: #4ade80;
+  --color-success-soft: #4ade8018;
+  --color-info: #8a9cbc;
+  --color-info-soft: #8a9cbc18;
 
   /* Radii — kept conservative. Editorial, not bubbly. */
   --radius-sm: 2px;
@@ -48,16 +50,16 @@
 /* Light fallback for daytime use. Kept warm, paper-like. */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --color-bg: #f7f3ea;
+    --color-bg: #fafaf9;
     --color-bg-elevated: #ffffff;
-    --color-bg-overlay: #fefbf4;
-    --color-fg: #1a1815;
-    --color-fg-muted: #5f5a52;
-    --color-fg-subtle: #8f8a80;
-    --color-border: #e4ddcd;
-    --color-border-strong: #c9c0aa;
-    --color-accent: #c4451f;
-    --color-accent-soft: #c4451f14;
+    --color-bg-overlay: #ffffff;
+    --color-fg: #1a1a1d;
+    --color-fg-muted: #5a5a5f;
+    --color-fg-subtle: #8a8a8e;
+    --color-border: #e6e6ea;
+    --color-border-strong: #cacacf;
+    --color-accent: #e81899;
+    --color-accent-soft: #e8189914;
     --color-accent-fg: #ffffff;
   }
 }
@@ -130,17 +132,17 @@ body {
   background: var(--color-bg);
   color: var(--color-fg);
   min-height: 100vh;
-  /* Subtle paper grain — barely perceptible, adds warmth */
+  /* Faint pink glow in corners — barely perceptible, reinforces brand */
   background-image:
     radial-gradient(
-      circle at 15% 10%,
-      rgba(224, 90, 50, 0.015) 0%,
-      transparent 40%
+      circle at 10% 0%,
+      rgba(232, 24, 153, 0.04) 0%,
+      transparent 45%
     ),
     radial-gradient(
-      circle at 85% 90%,
-      rgba(224, 90, 50, 0.012) 0%,
-      transparent 40%
+      circle at 95% 100%,
+      rgba(232, 24, 153, 0.025) 0%,
+      transparent 45%
     );
 }
 

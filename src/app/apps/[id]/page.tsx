@@ -3,10 +3,12 @@ import { notFound, redirect } from "next/navigation"
 import { ArrowLeft, Code2, ExternalLink } from "lucide-react"
 
 import { PipelineTracker } from "@/components/pipeline-tracker"
+import { SeverityDot } from "@/components/severity-dot"
 import { StageBadge } from "@/components/stage-badge"
 import { TopNav } from "@/components/top-nav"
 import type { App, Profile } from "@/lib/db-types"
-import { MONETIZATION_LABELS, daysInStage, mvpTimerLevel } from "@/lib/stages"
+import { computeAppStatus } from "@/lib/pipeline"
+import { MONETIZATION_LABELS } from "@/lib/stages"
 import { createClient } from "@/lib/supabase/server"
 import { cn } from "@/lib/utils"
 
@@ -42,9 +44,11 @@ export default async function AppDetailPage({
 
   if (!app) notFound()
 
-  const days = daysInStage(app.stage_entered_at)
-  const timerLevel =
-    app.current_stage === "mvp" ? mvpTimerLevel(days) : "ok"
+  const status = computeAppStatus({
+    current_stage: app.current_stage,
+    stage_entered_at: app.stage_entered_at,
+    pm: app.pm,
+  })
 
   const created = new Date(app.created_at).toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -98,27 +102,27 @@ export default async function AppDetailPage({
             {/* Stage row */}
             <div className="flex flex-wrap items-center gap-4 border-y border-[color:var(--color-border)] py-4">
               <StageBadge stage={app.current_stage} variant="prominent" />
-              <span
-                className={cn(
-                  "font-mono text-[11px] uppercase tracking-[0.2em]",
-                  timerLevel === "danger" &&
-                    "text-[color:var(--color-danger)]",
-                  timerLevel === "warning" &&
-                    "text-[color:var(--color-warning)]",
-                  timerLevel === "ok" &&
-                    "text-[color:var(--color-fg-muted)]"
-                )}
-              >
-                {days}d in stage
+              <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-[color:var(--color-fg-muted)]">
+                <SeverityDot severity={status.severity} />
+                {status.daysInStage}d in stage
               </span>
+              {status.blockers.length > 0 && (
+                <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[color:var(--color-fg-subtle)]">
+                  Waiting on{" "}
+                  <span className="text-[color:var(--color-fg)]">
+                    {status.blockers.join(", ")}
+                  </span>
+                </span>
+              )}
             </div>
 
-            {/* MVP warning when applicable */}
-            {app.current_stage === "mvp" && timerLevel !== "ok" && (
+            {/* Status banner when not idle */}
+            {(status.severity === "warning" ||
+              status.severity === "blocked") && (
               <div
                 className={cn(
                   "border-l-2 bg-[color:var(--color-bg-elevated)] p-4",
-                  timerLevel === "danger"
+                  status.severity === "blocked"
                     ? "border-[color:var(--color-danger)]"
                     : "border-[color:var(--color-warning)]"
                 )}
@@ -126,19 +130,24 @@ export default async function AppDetailPage({
                 <div
                   className={cn(
                     "font-mono text-[10px] uppercase tracking-[0.25em]",
-                    timerLevel === "danger"
+                    status.severity === "blocked"
                       ? "text-[color:var(--color-danger)]"
                       : "text-[color:var(--color-warning)]"
                   )}
                 >
-                  {timerLevel === "danger"
-                    ? "Danger · 4+ weeks stale"
-                    : "Warning · 2+ weeks in MVP"}
+                  {status.severity === "blocked" ? "Blocked" : "Warning"}
                 </div>
                 <p className="mt-1 text-sm text-[color:var(--color-fg)]">
-                  {timerLevel === "danger"
-                    ? "This app has been in MVP for over a month. Decide offline whether to promote to Ready for Mainnet or drop it."
-                    : "Time to decide next steps — promote, iterate, or close."}
+                  {status.reason}
+                  {status.blockers.length > 0 && (
+                    <>
+                      . Action expected from{" "}
+                      <span className="font-medium">
+                        {status.blockers.join(", ")}
+                      </span>
+                      .
+                    </>
+                  )}
                 </p>
               </div>
             )}
@@ -233,7 +242,7 @@ export default async function AppDetailPage({
                     Days in stage
                   </div>
                   <div className="font-serif text-2xl tabular-nums text-[color:var(--color-fg)]">
-                    {days}
+                    {status.daysInStage}
                   </div>
                 </div>
               </div>

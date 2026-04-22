@@ -113,7 +113,7 @@ export function CreateAppDialog() {
           </DialogHeader>
         </div>
 
-        <form action={formAction} className="space-y-6 p-8">
+        <form action={formAction} noValidate className="space-y-6 p-8">
           <Field label="App name" error={err("name")}>
             <input
               id="name"
