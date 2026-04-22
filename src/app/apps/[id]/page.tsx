@@ -2,6 +2,7 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { ArrowLeft, ExternalLink, Code2 } from "lucide-react"
 
+import { reconcileAppStage } from "@/app/apps/[id]/actions"
 import { PhaseActionCard } from "@/components/phase-action-card"
 import { PhaseProgress } from "@/components/phase-progress"
 import { SeverityDot } from "@/components/severity-dot"
@@ -34,6 +35,10 @@ export default async function AppDetailPage({
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect("/login")
+
+  // Reconcile before reading, so the view reflects auto-advances triggered
+  // by actions that happened before this logic existed.
+  await reconcileAppStage(id)
 
   const [{ data: profile }, { data: app }] = await Promise.all([
     supabase

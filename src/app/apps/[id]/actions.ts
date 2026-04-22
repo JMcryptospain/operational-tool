@@ -66,6 +66,93 @@ async function logTransition(
   })
 }
 
+/**
+ * Auto-advance stages whose exit criteria are already met. Runs in a loop so
+ * a single action can cascade across phases (e.g. if the admin fills every
+ * Refining check at once, the app jumps to Ready for Mainnet immediately).
+ *
+ * Exit rules:
+ *   MVP            → Refining   when owner_tested_at is set
+ *   Refining       → RFM        when owner_tested + legal approved + monet ready
+ *   RFM            → Launched   when both CTO and COO approved
+ */
+async function autoAdvanceChain(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  appId: string,
+  actorId: string
+) {
+  for (let safety = 0; safety < 5; safety++) {
+    const { data: app } = await supabase
+      .from("apps")
+      .select(
+        "current_stage, owner_tested_at, monetization_setup_complete"
+      )
+      .eq("id", appId)
+      .maybeSingle<{
+        current_stage: AppStage
+        owner_tested_at: string | null
+        monetization_setup_complete: boolean
+      }>()
+    if (!app) return
+
+    let nextStage: AppStage | null = null
+
+    if (app.current_stage === "mvp" && app.owner_tested_at) {
+      nextStage = "refining"
+    } else if (app.current_stage === "refining") {
+      const { data: legal } = await supabase
+        .from("approvals")
+        .select("status")
+        .eq("app_id", appId)
+        .eq("approver_role", "legal_lead")
+        .maybeSingle<{ status: ApprovalStatus }>()
+      if (
+        app.owner_tested_at &&
+        app.monetization_setup_complete &&
+        legal?.status === "approved"
+      ) {
+        nextStage = "ready_for_mainnet"
+      }
+    } else if (app.current_stage === "ready_for_mainnet") {
+      const { data: approvals } = await supabase
+        .from("approvals")
+        .select("approver_role, status")
+        .eq("app_id", appId)
+        .in("approver_role", ["cto", "coo"])
+        .returns<{ approver_role: ApproverRole; status: ApprovalStatus }[]>()
+      const byRole = new Map(
+        (approvals ?? []).map((a) => [a.approver_role, a.status])
+      )
+      if (
+        byRole.get("cto") === "approved" &&
+        byRole.get("coo") === "approved"
+      ) {
+        nextStage = "launched"
+      }
+    }
+
+    if (!nextStage) return
+
+    const patch: Record<string, unknown> = {
+      current_stage: nextStage,
+      stage_entered_at: new Date().toISOString(),
+    }
+    if (nextStage === "launched") patch.launched_at = new Date().toISOString()
+    if (nextStage === "ready_for_mainnet")
+      patch.ready_for_mainnet_window_start = new Date().toISOString()
+
+    await supabase.from("apps").update(patch).eq("id", appId)
+    await logTransition(
+      supabase,
+      appId,
+      app.current_stage,
+      nextStage,
+      actorId,
+      "Auto-advanced: all exit criteria met"
+    )
+  }
+}
+
 /* --- Refining phase checks --- */
 
 /** Owner of the app self-declares it is production-ready. */
@@ -101,6 +188,7 @@ export async function markOwnerTested(appId: string): Promise<ActionResult> {
       .eq("id", appId)
     if (error) return { ok: false, error: error.message }
 
+    await autoAdvanceChain(supabase, appId, profile.id)
     revalidatePath(`/apps/${appId}`)
     revalidatePath("/")
     return { ok: true }
@@ -135,6 +223,7 @@ export async function setMonetizationOperative(
       .eq("id", appId)
     if (error) return { ok: false, error: error.message }
 
+    if (value) await autoAdvanceChain(supabase, appId, profile.id)
     revalidatePath(`/apps/${appId}`)
     revalidatePath("/")
     return { ok: true }
@@ -171,7 +260,26 @@ export async function castApproval(input: {
     )
     if (error) return { ok: false, error: error.message }
 
+    if (input.decision === "approved")
+      await autoAdvanceChain(supabase, input.appId, profile.id)
     revalidatePath(`/apps/${input.appId}`)
+    revalidatePath("/")
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * Re-evaluate an app's exit criteria and auto-advance as many stages as
+ * apply. Safe to call on page load so that an app that had its checks
+ * approved while still on an earlier stage catches up on view.
+ */
+export async function reconcileAppStage(appId: string): Promise<ActionResult> {
+  try {
+    const { supabase, profile } = await loadActor()
+    await autoAdvanceChain(supabase, appId, profile.id)
+    revalidatePath(`/apps/${appId}`)
     revalidatePath("/")
     return { ok: true }
   } catch (e) {
