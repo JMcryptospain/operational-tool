@@ -13,10 +13,10 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="group relative flex w-full items-center justify-between gap-3 border border-[color:var(--color-fg)] bg-[color:var(--color-fg)] px-4 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-[color:var(--color-bg)] transition hover:bg-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent-fg)] disabled:opacity-50"
+      className="group flex w-full items-center justify-center gap-2 rounded bg-[color:var(--color-accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[color:var(--color-accent-strong)] disabled:opacity-50"
     >
       <span>{pending ? "Sending\u2026" : "Send magic link"}</span>
-      <ArrowRight className="size-4 transition group-hover:translate-x-1" />
+      <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
     </button>
   )
 }
@@ -26,11 +26,11 @@ export function LoginForm() {
 
   if (state.status === "sent") {
     return (
-      <div className="space-y-4">
-        <div className="flex gap-3 border border-[color:var(--color-success)]/30 bg-[color:var(--color-success-soft)] p-4">
+      <div className="space-y-3">
+        <div className="flex gap-3 rounded border border-[color:var(--color-success)]/40 bg-[color:var(--color-success-soft)] p-3">
           <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[color:var(--color-success)]" />
           <div className="space-y-1 text-sm">
-            <p className="text-[color:var(--color-fg)]">
+            <p className="font-medium text-[color:var(--color-fg)]">
               Check your inbox.
             </p>
             <p className="text-[color:var(--color-fg-muted)]">
@@ -38,7 +38,7 @@ export function LoginForm() {
             </p>
           </div>
         </div>
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[color:var(--color-fg-subtle)]">
+        <p className="text-xs text-[color:var(--color-fg-subtle)]">
           The link expires in 60 minutes.
         </p>
       </div>
@@ -46,14 +46,13 @@ export function LoginForm() {
   }
 
   return (
-    <form action={formAction} className="space-y-5">
-      <div className="space-y-2">
+    <form action={formAction} className="space-y-4">
+      <div className="space-y-1.5">
         <label
           htmlFor="email"
-          className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.2em] text-[color:var(--color-fg-muted)]"
+          className="text-xs font-medium text-[color:var(--color-fg)]"
         >
-          <span>Work email</span>
-          <span className="text-[color:var(--color-fg-subtle)]">@taiko.xyz</span>
+          Work email
         </label>
         <input
           id="email"
@@ -62,14 +61,17 @@ export function LoginForm() {
           placeholder="you@taiko.xyz"
           autoComplete="email"
           required
-          className="block w-full border-0 border-b border-[color:var(--color-border-strong)] bg-transparent px-0 py-2.5 text-base text-[color:var(--color-fg)] placeholder:text-[color:var(--color-fg-subtle)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-0"
+          className="block w-full rounded border border-[color:var(--color-border)] bg-white px-3 py-2 text-sm text-[color:var(--color-fg)] placeholder:text-[color:var(--color-fg-subtle)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--color-accent)]"
         />
       </div>
 
       <SubmitButton />
 
       {state.status === "error" && (
-        <p className="border-l-2 border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] py-2 pl-3 text-xs text-[color:var(--color-fg)]" role="alert">
+        <p
+          className="rounded border-l-2 border-[color:var(--color-danger)] bg-[color:var(--color-danger-soft)] py-2 pl-3 text-xs text-[color:var(--color-fg)]"
+          role="alert"
+        >
           {state.message}
         </p>
       )}

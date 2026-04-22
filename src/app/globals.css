@@ -1,70 +1,51 @@
 @import "tailwindcss";
 
 /* ============================================================
- * TAIKO LAUNCHPAD — Editorial Operations Console
- * Dark by default. Warm-black backgrounds, soft off-white fg,
- * terracotta accent used sparingly for state and emphasis.
+ * TAIKO LAUNCHPAD — light theme
+ * White surfaces, near-black text, thin grey borders. Taiko
+ * pink #E81899 for brand accent; green/amber/red for status.
  * ============================================================ */
 
 :root {
-  /* Type scale — editorial, generous leading */
   --font-display: var(--font-instrument-serif), "Iowan Old Style", "Palatino",
     Georgia, serif;
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Consolas,
     monospace;
 
-  /* Dark palette — neutral near-black so the Taiko pink carries all the heat. */
-  --color-bg: #0a0a0b;
-  --color-bg-elevated: #121214;
-  --color-bg-overlay: #17171a;
-  --color-fg: #f2f0ee;
-  --color-fg-muted: #9b9a97;
-  --color-fg-subtle: #64635f;
-  --color-border: #22222a;
-  --color-border-strong: #34343e;
+  --color-bg: #ffffff;
+  --color-bg-elevated: #ffffff;
+  --color-bg-subtle: #f7f7f8;
+  --color-bg-overlay: #ffffff;
+  --color-fg: #0f0f11;
+  --color-fg-muted: #555558;
+  --color-fg-subtle: #8b8b8f;
+  --color-border: #e6e6ea;
+  --color-border-strong: #c9c9cf;
 
-  /* Taiko brand accent — #E81899 magenta. Use with restraint. */
+  /* Taiko brand pink */
   --color-accent: #e81899;
-  --color-accent-soft: #e8189918;
-  --color-accent-strong: #ff2aa6;
+  --color-accent-soft: #fde4f1;
+  --color-accent-softer: #fef1f8;
+  --color-accent-strong: #c1137f;
   --color-accent-fg: #ffffff;
   --color-accent-tint: #ffc5e9;
 
-  /* Semantic — tuned to sit beside the brand pink */
-  --color-warning: #f0b23c;
-  --color-warning-soft: #f0b23c18;
-  --color-danger: #ef4444;
-  --color-danger-soft: #ef444418;
-  --color-success: #4ade80;
-  --color-success-soft: #4ade8018;
-  --color-info: #8a9cbc;
-  --color-info-soft: #8a9cbc18;
+  /* Semantic — pipeline states */
+  --color-success: #16a34a;
+  --color-success-soft: #dcfce7;
+  --color-warning: #d97706;
+  --color-warning-soft: #ffedd5;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fee2e2;
+  --color-info: #4b5563;
+  --color-info-soft: #f1f5f9;
 
-  /* Radii — kept conservative. Editorial, not bubbly. */
-  --radius-sm: 2px;
-  --radius-md: 3px;
-  --radius-lg: 4px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
 }
 
-/* Light fallback for daytime use. Kept warm, paper-like. */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --color-bg: #fafaf9;
-    --color-bg-elevated: #ffffff;
-    --color-bg-overlay: #ffffff;
-    --color-fg: #1a1a1d;
-    --color-fg-muted: #5a5a5f;
-    --color-fg-subtle: #8a8a8e;
-    --color-border: #e6e6ea;
-    --color-border-strong: #cacacf;
-    --color-accent: #e81899;
-    --color-accent-soft: #e8189914;
-    --color-accent-fg: #ffffff;
-  }
-}
-
-/* Theme bridge — shadcn components reference these names. */
 @theme inline {
   --color-background: var(--color-bg);
   --color-foreground: var(--color-fg);
@@ -74,9 +55,9 @@
   --color-popover-foreground: var(--color-fg);
   --color-primary: var(--color-fg);
   --color-primary-foreground: var(--color-bg);
-  --color-secondary: var(--color-bg-elevated);
+  --color-secondary: var(--color-bg-subtle);
   --color-secondary-foreground: var(--color-fg);
-  --color-muted: var(--color-bg-elevated);
+  --color-muted: var(--color-bg-subtle);
   --color-muted-foreground: var(--color-fg-muted);
   --color-accent: var(--color-accent-soft);
   --color-accent-foreground: var(--color-accent);
@@ -90,7 +71,6 @@
   --radius: var(--radius-md);
 }
 
-/* Base element resets with editorial feel. */
 *,
 *::before,
 *::after {
@@ -101,28 +81,19 @@
 html {
   background: var(--color-bg);
   color: var(--color-fg);
-  color-scheme: dark;
+  color-scheme: light;
   font-family: var(--font-sans);
-  font-feature-settings: "ss01", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
-@media (prefers-color-scheme: light) {
-  html:not([data-theme="dark"]) {
-    color-scheme: light;
-  }
-}
-
-/* Native form controls — keep the dark aesthetic consistent */
 select,
 option {
-  background-color: var(--color-bg-elevated);
+  background-color: var(--color-bg);
   color: var(--color-fg);
 }
 
-/* Editorial display headings — let the browser balance long serif titles */
 h1,
 h2 {
   text-wrap: balance;
@@ -132,53 +103,35 @@ body {
   background: var(--color-bg);
   color: var(--color-fg);
   min-height: 100vh;
-  /* Faint pink glow in corners — barely perceptible, reinforces brand */
-  background-image:
-    radial-gradient(
-      circle at 10% 0%,
-      rgba(232, 24, 153, 0.04) 0%,
-      transparent 45%
-    ),
-    radial-gradient(
-      circle at 95% 100%,
-      rgba(232, 24, 153, 0.025) 0%,
-      transparent 45%
-    );
 }
 
-/* Selection */
 ::selection {
   background: var(--color-accent);
   color: var(--color-accent-fg);
 }
 
-/* Focus — sharp, not soft */
 :focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
-/* Editorial serif — letterspacing, optical sizing */
 .font-serif {
   font-family: var(--font-display);
   font-optical-sizing: auto;
   letter-spacing: -0.01em;
 }
 
-/* Mono with tabular numerals for data alignment */
 .font-mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
-/* Rule — editorial hairline */
 .hr-editorial {
   height: 1px;
   background: var(--color-border);
   border: 0;
 }
 
-/* Fade-in on page load — subtle, not distracting */
 @keyframes editorial-fade-in {
   from {
     opacity: 0;
@@ -191,11 +144,7 @@ body {
 }
 
 .animate-fade-in {
-  animation: editorial-fade-in 0.5s cubic-bezier(0.2, 0, 0, 1) both;
-}
-
-.animate-fade-in-delayed {
-  animation: editorial-fade-in 0.6s cubic-bezier(0.2, 0, 0, 1) 0.1s both;
+  animation: editorial-fade-in 0.4s cubic-bezier(0.2, 0, 0, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -209,7 +158,6 @@ body {
   }
 }
 
-/* Tabular number utility */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }

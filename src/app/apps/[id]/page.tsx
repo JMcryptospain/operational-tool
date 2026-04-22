@@ -208,12 +208,6 @@ export default async function AppDetailPage({
                 </Section>
               )}
 
-              <Section title="Next steps">
-                <p className="text-sm text-[color:var(--color-fg-muted)]">
-                  Approvals, feedback threads, and stage transitions will
-                  appear here as we build Ready for Mainnet.
-                </p>
-              </Section>
             </div>
 
             {/* Sidenote */}

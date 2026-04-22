@@ -23,10 +23,10 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="group flex items-center justify-between gap-3 border border-[color:var(--color-fg)] bg-[color:var(--color-fg)] px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-[color:var(--color-bg)] transition hover:border-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)] hover:text-[color:var(--color-accent-fg)] disabled:opacity-50"
+      className="inline-flex items-center gap-2 rounded bg-[color:var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[color:var(--color-accent-strong)] disabled:opacity-50"
     >
       <span>{pending ? "Submitting\u2026" : "Submit as MVP"}</span>
-      <ArrowRight className="size-4 transition group-hover:translate-x-1" />
+      <ArrowRight className="size-3.5" />
     </button>
   )
 }
@@ -70,10 +70,10 @@ function Field({
 }
 
 const inputClass =
-  "block w-full border-0 border-b border-[color:var(--color-border-strong)] bg-transparent px-0 py-2 text-sm text-[color:var(--color-fg)] placeholder:text-[color:var(--color-fg-subtle)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-0"
+  "block w-full rounded border border-[color:var(--color-border)] bg-white px-3 py-2 text-sm text-[color:var(--color-fg)] placeholder:text-[color:var(--color-fg-subtle)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--color-accent)]"
 
 const textareaClass =
-  "block w-full border border-[color:var(--color-border-strong)] bg-transparent px-3 py-2 text-sm text-[color:var(--color-fg)] placeholder:text-[color:var(--color-fg-subtle)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-0 resize-none"
+  "block w-full rounded border border-[color:var(--color-border)] bg-white px-3 py-2 text-sm text-[color:var(--color-fg)] placeholder:text-[color:var(--color-fg-subtle)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--color-accent)] resize-none"
 
 export function CreateAppDialog() {
   const [open, setOpen] = useState(false)
@@ -87,33 +87,30 @@ export function CreateAppDialog() {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="group flex items-center justify-between gap-3 border border-[color:var(--color-fg)] bg-[color:var(--color-fg)] px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-[color:var(--color-bg)] transition hover:border-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)] hover:text-[color:var(--color-accent-fg)]"
+          className="inline-flex items-center gap-2 rounded bg-[color:var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[color:var(--color-accent-strong)]"
         >
-          <Plus className="size-4" />
-          <span>Submit new app</span>
+          <Plus className="size-3.5" />
+          <span>New app</span>
         </button>
       </DialogTrigger>
       <DialogContent
-        className="max-h-[92vh] overflow-y-auto gap-0 rounded-none border-[color:var(--color-border)] bg-[color:var(--color-bg-elevated)] p-0 sm:max-w-2xl"
+        className="max-h-[92vh] overflow-y-auto gap-0 rounded-lg border border-[color:var(--color-border)] bg-white p-0 sm:max-w-2xl"
       >
-        <div className="border-b border-[color:var(--color-border)] p-8 pb-6">
-          <DialogHeader className="space-y-2">
-            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-[color:var(--color-fg-subtle)]">
-              New · Stage 01 · MVP
-            </div>
+        <div className="border-b border-[color:var(--color-border)] px-6 py-5">
+          <DialogHeader className="space-y-1">
             <DialogTitle asChild>
-              <h2 className="font-serif text-3xl text-[color:var(--color-fg)]">
-                Submit a new app.
+              <h2 className="text-lg font-semibold text-[color:var(--color-fg)]">
+                Submit a new app
               </h2>
             </DialogTitle>
             <DialogDescription className="text-sm text-[color:var(--color-fg-muted)]">
-              Make sure the idea has been green-lit by your manager. You can
-              refine these fields any time before Ready for Mainnet.
+              Stage 01 · MVP. Your idea should have been green-lit by your
+              manager beforehand.
             </DialogDescription>
           </DialogHeader>
         </div>
 
-        <form action={formAction} noValidate className="space-y-6 p-8">
+        <form action={formAction} noValidate className="space-y-5 px-6 py-6">
           <Field label="App name" error={err("name")}>
             <input
               id="name"

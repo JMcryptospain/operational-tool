@@ -29,11 +29,8 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0b0a08" },
-    { media: "(prefers-color-scheme: light)", color: "#f7f3ea" },
-  ],
-  colorScheme: "dark",
+  themeColor: "#ffffff",
+  colorScheme: "light",
 }
 
 export default function RootLayout({
@@ -44,7 +41,6 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      data-theme="dark"
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full antialiased`}
     >
       <body className="min-h-screen">

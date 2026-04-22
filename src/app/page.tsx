@@ -25,7 +25,7 @@ type DashboardApp = Pick<
 > & {
   pm: Pick<Profile, "full_name" | "email"> | null
   approvals: ApprovalRow[]
-  marketing_checklist: MarketingChecklist[] // array; Supabase returns [] or [row]
+  marketing_checklist: MarketingChecklist[]
 }
 
 export default async function DashboardPage() {
@@ -62,40 +62,29 @@ export default async function DashboardPage() {
       marketing: app.marketing_checklist?.[0] ?? null,
       pmName: app.pm?.full_name ?? null,
     })
-    return { id: app.id, name: app.name, progress }
+    return {
+      id: app.id,
+      name: app.name,
+      pm_name: app.pm?.full_name ?? app.pm?.email ?? "",
+      days_in_stage: progress.daysInStage,
+      progress,
+    }
   })
 
   const blocked = rows.filter((r) => r.progress.severity === "blocked").length
   const warning = rows.filter((r) => r.progress.severity === "warning").length
 
-  // Bottleneck strip — only surface people actively holding things up.
-  // For the first milestone this uses generic role labels; once approvals
-  // are wired live, computeAppStatus will return real names.
-  const bottlenecks = new Map<string, number>()
-  for (const r of rows) {
-    if (r.progress.severity === "idle" || r.progress.severity === "watching")
-      continue
-    // We intentionally avoid a heavy join here for the landing; the
-    // blockers come from computeAppStatus which is keyed by role label.
-  }
-  void bottlenecks
-
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[color:var(--color-bg-subtle)]">
       <TopNav profile={profile ?? null} fallbackEmail={user.email ?? ""} />
 
-      <main className="mx-auto w-full max-w-[108rem] px-6 py-6 lg:px-10">
-        {/* Thin top strip: title + tiny stats + CTA */}
-        <div className="flex flex-wrap items-end justify-between gap-6 border-b border-[color:var(--color-border)] pb-4">
-          <div className="flex items-end gap-8">
-            <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]">
-                Taiko Launchpad
-              </div>
-              <h1 className="mt-1 font-serif text-2xl leading-none text-[color:var(--color-fg)]">
-                All apps
-              </h1>
-            </div>
+      <main className="mx-auto w-full max-w-[108rem] px-6 py-4 lg:px-10">
+        {/* Compact single-line header: title · mini stats · CTA */}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-5">
+            <h1 className="text-sm font-semibold text-[color:var(--color-fg)]">
+              All apps
+            </h1>
             <InlineStats
               total={rows.length}
               warning={warning}
@@ -105,13 +94,7 @@ export default async function DashboardPage() {
           <CreateAppDialog />
         </div>
 
-        <div className="mt-6">
-          {rows.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <PipelineTable rows={rows} />
-          )}
-        </div>
+        {rows.length === 0 ? <EmptyState /> : <PipelineTable rows={rows} />}
       </main>
     </div>
   )
@@ -126,39 +109,45 @@ function InlineStats({
   warning: number
   blocked: number
 }) {
-  const items = [
-    { label: "Total", value: total, tone: "default" as const },
-    { label: "Warning", value: warning, tone: "warning" as const },
-    { label: "Blocked", value: blocked, tone: "danger" as const },
-  ]
   return (
-    <div className="flex divide-x divide-[color:var(--color-border)] border border-[color:var(--color-border)]">
-      {items.map((s) => (
-        <div key={s.label} className="flex min-w-[4.5rem] flex-col px-3 py-1.5">
-          <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-[color:var(--color-fg-subtle)]">
-            {s.label}
-          </span>
-          <span
-            className={cn(
-              "font-mono text-lg tabular-nums",
-              s.tone === "danger" && s.value > 0
-                ? "text-[color:var(--color-danger)]"
-                : s.tone === "warning" && s.value > 0
-                  ? "text-[color:var(--color-warning)]"
-                  : "text-[color:var(--color-fg)]"
-            )}
-          >
-            {s.value}
-          </span>
-        </div>
-      ))}
+    <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.18em]">
+      <span className="text-[color:var(--color-fg-muted)]">
+        {total} {total === 1 ? "app" : "apps"}
+      </span>
+      <span className="text-[color:var(--color-border-strong)]">·</span>
+      <Stat label="Warning" value={warning} tone="warning" />
+      <Stat label="Blocked" value={blocked} tone="danger" />
     </div>
+  )
+}
+
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: number
+  tone: "warning" | "danger"
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5",
+        value === 0 && "text-[color:var(--color-fg-subtle)]",
+        value > 0 && tone === "warning" && "text-[color:var(--color-warning)]",
+        value > 0 && tone === "danger" && "text-[color:var(--color-danger)]"
+      )}
+    >
+      <span>{label}</span>
+      <span className="font-semibold">{value}</span>
+    </span>
   )
 }
 
 function EmptyState() {
   return (
-    <div className="border border-dashed border-[color:var(--color-border-strong)] py-16 text-center">
+    <div className="rounded border border-dashed border-[color:var(--color-border-strong)] bg-white py-16 text-center">
       <p className="text-sm text-[color:var(--color-fg-muted)]">
         No apps yet. Submit the first MVP to start tracking it.
       </p>

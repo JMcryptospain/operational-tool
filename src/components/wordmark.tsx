@@ -1,19 +1,17 @@
-import Image from "next/image"
 import { cn } from "@/lib/utils"
 
 /**
- * Taiko Launchpad wordmark. Pairs the official Taiko drum mark with the
- * product name. The "Launchpad" descriptor is set in italic serif and
- * colored with the brand pink so it never shouts over the mark itself.
+ * Taiko Launchpad wordmark. The drum mark is rendered as a CSS mask so we
+ * can tint it with the Taiko pink regardless of the source SVG's fill.
  */
 const MARK_SIZES = {
-  sm: 24,
-  md: 36,
-  lg: 56,
+  sm: 22,
+  md: 34,
+  lg: 52,
 }
 
 const TEXT_SIZES = {
-  sm: "text-lg",
+  sm: "text-base",
   md: "text-2xl",
   lg: "text-5xl sm:text-6xl",
 }
@@ -30,18 +28,26 @@ export function Wordmark({
   const markSize = MARK_SIZES[size]
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <div className="flex items-center gap-3">
-        <Image
-          src="/brand/taiko-mark.svg"
-          alt="Taiko"
-          width={markSize}
-          height={markSize}
-          style={{ width: markSize, height: "auto" }}
-          className="shrink-0"
-          priority
+    <div className={cn("flex flex-col gap-1", className)}>
+      <div className="flex items-center gap-2.5">
+        <span
+          aria-label="Taiko"
+          role="img"
+          className="shrink-0 bg-[color:var(--color-accent)]"
+          style={{
+            width: markSize,
+            height: markSize,
+            maskImage: "url(/brand/taiko-mark.svg)",
+            WebkitMaskImage: "url(/brand/taiko-mark.svg)",
+            maskRepeat: "no-repeat",
+            WebkitMaskRepeat: "no-repeat",
+            maskSize: "contain",
+            WebkitMaskSize: "contain",
+            maskPosition: "center",
+            WebkitMaskPosition: "center",
+          }}
         />
-        <h1
+        <span
           className={cn(
             "font-serif leading-none tracking-tight text-[color:var(--color-fg)]",
             TEXT_SIZES[size]
@@ -51,13 +57,13 @@ export function Wordmark({
           <span className="italic text-[color:var(--color-accent)]">
             Launchpad
           </span>
-        </h1>
+        </span>
       </div>
 
       {showDescriptor && size !== "sm" && (
         <div
           className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-[color:var(--color-fg-subtle)]"
-          style={{ paddingLeft: `${markSize + 12}px` }}
+          style={{ paddingLeft: `${markSize + 10}px` }}
         >
           <span className="h-px w-4 bg-[color:var(--color-border-strong)]" />
           <span>Internal Operations</span>
