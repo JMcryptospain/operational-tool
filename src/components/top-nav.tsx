@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Settings } from "lucide-react"
 import { signOut } from "@/app/auth/actions"
 import type { Profile } from "@/lib/db-types"
 import { Wordmark } from "./wordmark"
@@ -25,6 +26,16 @@ export function TopNav({
         </Link>
 
         <div className="flex items-center gap-4">
+          {role === "admin" && (
+            <Link
+              href="/admin"
+              className="inline-flex items-center gap-1.5 rounded border border-[color:var(--color-border)] bg-white px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[color:var(--color-fg-muted)] transition hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
+            >
+              <Settings className="size-3" />
+              Admin
+            </Link>
+          )}
+
           <div className="hidden flex-col items-end gap-0.5 sm:flex">
             <span className="text-xs text-[color:var(--color-fg)]">{name}</span>
             <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[color:var(--color-fg-subtle)]">
