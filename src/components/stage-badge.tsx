@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
  */
 const STAGE_CODES: Record<AppStage, string> = {
   mvp: "MV",
+  refining: "RF",
   ready_for_mainnet: "RM",
   monetization_setup: "MN",
   launched: "LN",
@@ -19,6 +20,7 @@ const STAGE_CODES: Record<AppStage, string> = {
 
 const STAGE_COLORS: Record<AppStage, string> = {
   mvp: "text-[color:var(--color-info)]",
+  refining: "text-[color:var(--color-accent)]",
   ready_for_mainnet: "text-[color:var(--color-warning)]",
   monetization_setup: "text-[color:var(--color-accent)]",
   launched: "text-[color:var(--color-success)]",

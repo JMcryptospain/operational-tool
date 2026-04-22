@@ -18,6 +18,7 @@ export type AppRole =
 
 export type AppStage =
   | "mvp"
+  | "refining"
   | "ready_for_mainnet"
   | "monetization_setup"
   | "launched"
@@ -57,6 +58,7 @@ export type App = {
   monetization_model: MonetizationModel | null
   monetization_description: string | null
   monetization_setup_complete: boolean
+  owner_tested_at: string | null
   posthog_project_id: string | null
   current_stage: AppStage
   stage_entered_at: string

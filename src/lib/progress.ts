@@ -4,12 +4,15 @@ import type { BlockerSeverity } from "./pipeline"
 import { computeAppStatus } from "./pipeline"
 
 /**
- * Derived per-app "progress object" used to paint the landing timeline.
+ * Per-app "progress object" used to paint the landing timeline and the
+ * detail page. Five phases, left to right:
  *
- * Each phase has:
- *  - `state`: "completed" if the app has moved past it; "active" if this
- *     is the app's current stage; "pending" otherwise.
- *  - `checks` (optional): ordered sub-checks with their individual state.
+ *   1. MVP                 — PM submits the app
+ *   2. Refining & Legal    — Owner confirms readiness, Jonathan signs off
+ *                            on legal + monetization operational wiring
+ *   3. Ready for Mainnet   — Gustavo + Joaquín approve the launch (48h)
+ *   4. Launched            — App is live on mainnet
+ *   5. MKT Basic           — Tweet / Proving Ground article / Video
  */
 
 export type PhaseState = "completed" | "active" | "pending"
@@ -25,11 +28,10 @@ export type Check = {
   id: string
   label: string
   state: CheckState
-  /** Optional fuller name, shown in tooltips / detail. */
   title?: string
 }
 
-export type PhaseKey = "mvp" | "rfm" | "launched" | "mkt"
+export type PhaseKey = "mvp" | "refining" | "rfm" | "launched" | "mkt"
 
 export type Phase = {
   key: PhaseKey
@@ -48,8 +50,9 @@ export type AppProgress = {
 /** Order used to compare "past" vs "future" vs "current" phase. */
 const STAGE_RANK: Record<AppStage, number> = {
   mvp: 0,
-  ready_for_mainnet: 1,
-  monetization_setup: 2,
+  refining: 1,
+  ready_for_mainnet: 2,
+  monetization_setup: 3,
   launched: 3,
   review: 4,
   active: 4,
@@ -63,6 +66,7 @@ export function computeAppProgress(input: {
     | "current_stage"
     | "stage_entered_at"
     | "monetization_setup_complete"
+    | "owner_tested_at"
   >
   approvals: ApprovalRow[]
   marketing: MarketingChecklist | null
@@ -81,60 +85,55 @@ export function computeAppProgress(input: {
     return "pending"
   }
 
-  // --- MVP: single implicit check "app submitted".
-  const mvpPhase: Phase = {
-    key: "mvp",
-    label: "MVP",
-    state: phaseState(0),
-    checks: [
-      {
-        id: "submitted",
-        label: "Submitted",
-        state: "done",
-      },
-    ],
-  }
-
-  // --- Ready for Mainnet: CTO, COO, Legal, Monetization setup ready
   const approvalByRole = new Map(
     input.approvals.map((a) => [a.approver_role, a.status])
   )
-  const mapApproval = (
-    role: "cto" | "coo" | "legal_lead"
+  const approvalCheck = (
+    role: "cto" | "coo" | "legal_lead",
+    minRank: number
   ): CheckState => {
     const s = approvalByRole.get(role)
-    if (!s) return rank >= 1 ? "pending" : "not_started"
+    if (!s) return rank >= minRank ? "pending" : "not_started"
     if (s === "approved") return "approved"
     if (s === "rejected") return "rejected"
     return "pending"
   }
-  const rfmPhase: Phase = {
-    key: "rfm",
-    label: "Ready for Mainnet",
+
+  // --- 1. MVP
+  const mvpPhase: Phase = {
+    key: "mvp",
+    label: "MVP",
+    state: phaseState(0),
+    checks: [{ id: "submitted", label: "Submitted", state: "done" }],
+  }
+
+  // --- 2. Refining & Legal
+  const ownerTested: CheckState = input.app.owner_tested_at
+    ? "done"
+    : rank >= 1
+      ? "pending"
+      : "not_started"
+  const refiningPhase: Phase = {
+    key: "refining",
+    label: "Refining & Legal",
     state: phaseState(1),
     checks: [
       {
-        id: "cto",
-        label: "Gustavo",
-        title: "CTO approval",
-        state: mapApproval("cto"),
-      },
-      {
-        id: "coo",
-        label: "Joaquín",
-        title: "COO approval",
-        state: mapApproval("coo"),
+        id: "owner_tested",
+        label: "Owner tested",
+        title: "Owner has tested end-to-end",
+        state: ownerTested,
       },
       {
         id: "legal",
         label: "Legal",
-        title: "Jonathan / Legal lead",
-        state: mapApproval("legal_lead"),
+        title: "Jonathan · High-level legal review",
+        state: approvalCheck("legal_lead", 1),
       },
       {
         id: "monet",
-        label: "Monet.",
-        title: "Monetization setup ready",
+        label: "Monet. operative",
+        title: "Monetization operationally ready",
         state: input.app.monetization_setup_complete
           ? "done"
           : rank >= 1
@@ -144,7 +143,28 @@ export function computeAppProgress(input: {
     ],
   }
 
-  // --- Launched on mainnet
+  // --- 3. Ready for Mainnet
+  const rfmPhase: Phase = {
+    key: "rfm",
+    label: "Ready for Mainnet",
+    state: phaseState(2),
+    checks: [
+      {
+        id: "cto",
+        label: "Gustavo",
+        title: "CTO approval",
+        state: approvalCheck("cto", 2),
+      },
+      {
+        id: "coo",
+        label: "Joaquín",
+        title: "COO approval",
+        state: approvalCheck("coo", 2),
+      },
+    ],
+  }
+
+  // --- 4. Launched
   const launchedPhase: Phase = {
     key: "launched",
     label: "Launched",
@@ -158,7 +178,7 @@ export function computeAppProgress(input: {
     ],
   }
 
-  // --- MKT basic package
+  // --- 5. MKT basic
   const mkt = input.marketing
   const mktCheckState = (flag: boolean): CheckState =>
     flag ? "done" : rank >= 3 ? "pending" : "not_started"
@@ -206,7 +226,7 @@ export function computeAppProgress(input: {
     severity: status.severity,
     daysInStage: status.daysInStage,
     currentPhase,
-    phases: [mvpPhase, rfmPhase, launchedPhase, mktPhase],
+    phases: [mvpPhase, refiningPhase, rfmPhase, launchedPhase, mktPhase],
   }
 }
 
@@ -214,9 +234,11 @@ function phaseKeyForStage(stage: AppStage): PhaseKey {
   switch (stage) {
     case "mvp":
       return "mvp"
+    case "refining":
+      return "refining"
     case "ready_for_mainnet":
-    case "monetization_setup":
       return "rfm"
+    case "monetization_setup":
     case "launched":
       return "launched"
     default:

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
  */
 const PIPELINE: AppStage[] = [
   "mvp",
+  "refining",
   "ready_for_mainnet",
   "monetization_setup",
   "launched",
@@ -19,6 +20,7 @@ const PIPELINE: AppStage[] = [
 
 const LABELS: Record<AppStage, string> = {
   mvp: "MVP",
+  refining: "Refining",
   ready_for_mainnet: "Ready",
   monetization_setup: "Pay",
   launched: "Launch",

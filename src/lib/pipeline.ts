@@ -44,6 +44,7 @@ export function computeAppStatus(app: StatusInput): AppStatus {
     }
 
     case "mvp":
+    case "refining":
     case "monetization_setup":
     case "launched":
     case "review":
@@ -68,6 +69,7 @@ export function computeAppStatus(app: StatusInput): AppStatus {
 
 const STAGE_REASON: Record<AppStage, string> = {
   mvp: "Building",
+  refining: "Refining & legal review",
   ready_for_mainnet: "Awaiting approvals",
   monetization_setup: "Wiring payments",
   launched: "Live",
@@ -120,6 +122,7 @@ export function compareSeverity(a: BlockerSeverity, b: BlockerSeverity) {
 
 export const PIPELINE_STAGES: AppStage[] = [
   "mvp",
+  "refining",
   "ready_for_mainnet",
   "monetization_setup",
   "launched",

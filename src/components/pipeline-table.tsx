@@ -86,8 +86,9 @@ export function PipelineTable({ rows }: { rows: PipelineRow[] }) {
           style={{ gridTemplateColumns: COLUMN_WIDTHS }}
         >
           <div>App</div>
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid grid-cols-5 gap-1">
             <span>MVP</span>
+            <span>Refining & Legal</span>
             <span>Ready for Mainnet</span>
             <span>Launched</span>
             <span>MKT Basic</span>
@@ -154,7 +155,7 @@ function RowItem({
         {/* 2 · Progress bar spanning the four phase columns */}
         <div>
           <PhaseProgress progress={row.progress} />
-          <div className="mt-1 grid grid-cols-4 gap-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[color:var(--color-fg-subtle)]">
+          <div className="mt-1 grid grid-cols-5 gap-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[color:var(--color-fg-subtle)]">
             {row.progress.phases.map((p) => (
               <span
                 key={p.key}

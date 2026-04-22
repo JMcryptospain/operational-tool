@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
  */
 export function PhaseChecksGrid({ phases }: { phases: Phase[] }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
       {phases.map((phase) => (
         <PhaseColumn key={phase.key} phase={phase} />
       ))}
