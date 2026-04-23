@@ -49,9 +49,14 @@ export default async function AppDetailPage({
     await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, email, role")
+        .select("id, full_name, email, role, is_admin")
         .eq("id", user.id)
-        .maybeSingle<Pick<Profile, "id" | "full_name" | "email" | "role">>(),
+        .maybeSingle<
+          Pick<
+            Profile,
+            "id" | "full_name" | "email" | "role" | "is_admin"
+          >
+        >(),
       supabase
         .from("apps")
         .select(
@@ -104,7 +109,7 @@ export default async function AppDetailPage({
     isLegal: profile?.role === "legal_lead",
     isMarketing: profile?.role === "marketing_lead",
     isCofounder: profile?.role === "cofounder",
-    isAdmin: profile?.role === "admin",
+    isAdmin: Boolean(profile?.is_admin),
   }
 
   const created = new Date(app.created_at).toLocaleDateString("en-GB", {

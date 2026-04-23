@@ -14,10 +14,10 @@ async function requireAdmin() {
   if (!user) throw new Error("Not authenticated")
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role")
+    .select("id, role, is_admin")
     .eq("id", user.id)
-    .maybeSingle<{ id: string; role: AppRole }>()
-  if (!profile || profile.role !== "admin") {
+    .maybeSingle<{ id: string; role: AppRole; is_admin: boolean }>()
+  if (!profile || !profile.is_admin) {
     throw new Error("Admin only")
   }
   return { supabase, profile }
@@ -39,18 +39,12 @@ export async function updateProfileRole(input: {
   role: AppRole
 }): Promise<Result> {
   try {
-    const { supabase, profile } = await requireAdmin()
+    const { supabase } = await requireAdmin()
     if (!VALID_ROLES.includes(input.role))
       return { ok: false, error: "Invalid role" }
 
-    // An admin cannot demote themselves. Another admin must do it.
-    if (input.profileId === profile.id) {
-      return {
-        ok: false,
-        error: "You cannot change your own role. Ask another admin.",
-      }
-    }
-
+    // Admin flag lives on a separate column now, so changing your own
+    // operational role is safe — it doesn't affect admin privileges.
     const { error } = await supabase
       .from("profiles")
       .update({ role: input.role })
@@ -78,20 +72,6 @@ export async function preassignRole(input: {
       return { ok: false, error: `Only @${TAIKO_DOMAIN} addresses allowed` }
     if (!VALID_ROLES.includes(input.role))
       return { ok: false, error: "Invalid role" }
-
-    // An admin cannot pre-assign a role to their own email — that path was
-    // being used to sneak around the self-demotion block on profiles.
-    const { data: selfRow } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("id", profile.id)
-      .maybeSingle<{ email: string }>()
-    if (selfRow && selfRow.email.toLowerCase() === email) {
-      return {
-        ok: false,
-        error: "You cannot assign a role to yourself. Ask another admin.",
-      }
-    }
 
     const { error } = await supabase.from("role_assignments").upsert(
       {

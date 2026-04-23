@@ -171,7 +171,7 @@ function CheckAction({
     if (check.id === "owner_tested")
       return (
         <AsyncButton
-          disabled={!actor.isOwner && !actor.isAdmin}
+          disabled={!actor.isOwner}
           disabledHint="Only the owner can confirm"
           done={check.state === "done"}
           onClick={() => markOwnerTested(appId)}
@@ -182,7 +182,7 @@ function CheckAction({
     if (check.id === "legal")
       return (
         <ApprovalButtons
-          disabled={!actor.isLegal && !actor.isAdmin}
+          disabled={!actor.isLegal}
           current={check.state}
           onDecide={(decision) =>
             castApproval({
@@ -196,7 +196,7 @@ function CheckAction({
     if (check.id === "monet")
       return (
         <AsyncButton
-          disabled={!actor.isLegal && !actor.isOwner && !actor.isAdmin}
+          disabled={!actor.isLegal && !actor.isOwner}
           disabledHint="Jonathan or the owner"
           done={check.state === "done"}
           onClick={() => setMonetizationOperative(appId, true)}
@@ -210,7 +210,7 @@ function CheckAction({
     if (check.id === "cto")
       return (
         <ApprovalButtons
-          disabled={!actor.isCTO && !actor.isAdmin}
+          disabled={!actor.isCTO}
           current={check.state}
           onDecide={(decision) =>
             castApproval({ appId, approverRole: "cto", decision })
@@ -220,7 +220,7 @@ function CheckAction({
     if (check.id === "coo")
       return (
         <ApprovalButtons
-          disabled={!actor.isCOO && !actor.isAdmin}
+          disabled={!actor.isCOO}
           current={check.state}
           onDecide={(decision) =>
             castApproval({ appId, approverRole: "coo", decision })
@@ -240,7 +240,7 @@ function CheckAction({
     if (field) {
       return (
         <AsyncButton
-          disabled={!actor.isMarketing && !actor.isAdmin}
+          disabled={!actor.isMarketing}
           disabledHint="Marketing Lead"
           done={check.state === "done"}
           onClick={() => setMarketingCheck({ appId, field, value: true })}
@@ -475,7 +475,7 @@ function AdvanceButton({
   )
 
   // Who is allowed to push advance: owner, privileged roles, admin.
-  const allowed = actor.isOwner || actor.isCTO || actor.isCOO || actor.isAdmin
+  const allowed = actor.isOwner || actor.isCTO || actor.isCOO
 
   if (!allowed && !allDone) return null
 

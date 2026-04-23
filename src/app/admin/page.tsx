@@ -24,12 +24,14 @@ export default async function AdminPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, full_name, email, role")
+    .select("id, full_name, email, role, is_admin")
     .eq("id", user.id)
-    .maybeSingle<Pick<Profile, "id" | "full_name" | "email" | "role">>()
+    .maybeSingle<
+      Pick<Profile, "id" | "full_name" | "email" | "role" | "is_admin">
+    >()
 
   // Admin gate — non-admins just get a 404.
-  if (profile?.role !== "admin") notFound()
+  if (!profile?.is_admin) notFound()
 
   const [{ data: profiles }, { data: preassigned }] = await Promise.all([
     supabase

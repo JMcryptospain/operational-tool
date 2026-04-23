@@ -26,11 +26,12 @@ async function loadActor() {
   const { supabase, user } = await requireUser()
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, full_name, email")
+    .select("id, role, is_admin, full_name, email")
     .eq("id", user.id)
     .maybeSingle<{
       id: string
       role: AppRole
+      is_admin: boolean
       full_name: string | null
       email: string
     }>()
@@ -38,11 +39,15 @@ async function loadActor() {
   return { supabase, user, profile }
 }
 
+/**
+ * Approval rights are driven by the operational role ALONE. The admin flag
+ * is only for managing the tool (/admin panel), not for approving apps.
+ * An admin who wants approval rights needs the matching operational role.
+ */
 function canActAsApprover(
   actorRole: AppRole,
   approverRole: ApproverRole
 ): boolean {
-  if (actorRole === "admin") return true
   if (approverRole === "cto" && actorRole === "cto") return true
   if (approverRole === "coo" && actorRole === "coo") return true
   if (approverRole === "legal_lead" && actorRole === "legal_lead") return true
@@ -172,7 +177,7 @@ export async function markOwnerTested(appId: string): Promise<ActionResult> {
       }>()
     if (!app) return { ok: false, error: "App not found" }
 
-    if (profile.role !== "admin" && app.pm_id !== profile.id) {
+    if (app.pm_id !== profile.id) {
       return { ok: false, error: "Only the owner can confirm testing" }
     }
     if (app.current_stage !== "refining" && app.current_stage !== "mvp") {
@@ -212,9 +217,7 @@ export async function setMonetizationOperative(
     if (!app) return { ok: false, error: "App not found" }
 
     const allowed =
-      profile.role === "admin" ||
-      profile.role === "legal_lead" ||
-      profile.id === app.pm_id
+      profile.role === "legal_lead" || profile.id === app.pm_id
     if (!allowed) return { ok: false, error: "Not authorized" }
 
     const { error } = await supabase
@@ -315,10 +318,7 @@ export async function advanceStage(input: {
       }>()
     if (!app) return { ok: false, error: "App not found" }
 
-    const isPrivileged =
-      profile.role === "admin" ||
-      profile.role === "cto" ||
-      profile.role === "coo"
+    const isPrivileged = profile.role === "cto" || profile.role === "coo"
     const isOwner = app.pm_id === profile.id
 
     // Exit criteria per current stage
@@ -416,10 +416,7 @@ export async function setMarketingCheck(input: {
 }): Promise<ActionResult> {
   try {
     const { supabase, profile } = await loadActor()
-    if (
-      profile.role !== "marketing_lead" &&
-      profile.role !== "admin"
-    ) {
+    if (profile.role !== "marketing_lead") {
       return { ok: false, error: "Only Marketing Lead can update this" }
     }
 
@@ -466,7 +463,7 @@ export async function castVeto(input: {
 }): Promise<ActionResult> {
   try {
     const { supabase, profile } = await loadActor()
-    if (profile.role !== "cofounder" && profile.role !== "admin") {
+    if (profile.role !== "cofounder") {
       return { ok: false, error: "Only cofounders can veto" }
     }
     const reason = input.reason.trim()

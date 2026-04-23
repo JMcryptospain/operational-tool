@@ -40,9 +40,11 @@ export default async function DashboardPage() {
   const [{ data: profile }, { data: apps }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, email, role")
+      .select("full_name, email, role, is_admin")
       .eq("id", user.id)
-      .maybeSingle<Pick<Profile, "full_name" | "email" | "role">>(),
+      .maybeSingle<
+        Pick<Profile, "full_name" | "email" | "role" | "is_admin">
+      >(),
     supabase
       .from("apps")
       .select(
