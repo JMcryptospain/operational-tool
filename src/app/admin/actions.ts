@@ -39,9 +39,17 @@ export async function updateProfileRole(input: {
   role: AppRole
 }): Promise<Result> {
   try {
-    const { supabase } = await requireAdmin()
+    const { supabase, profile } = await requireAdmin()
     if (!VALID_ROLES.includes(input.role))
       return { ok: false, error: "Invalid role" }
+
+    // An admin cannot demote themselves. Another admin must do it.
+    if (input.profileId === profile.id) {
+      return {
+        ok: false,
+        error: "You cannot change your own role. Ask another admin.",
+      }
+    }
 
     const { error } = await supabase
       .from("profiles")
@@ -70,6 +78,20 @@ export async function preassignRole(input: {
       return { ok: false, error: `Only @${TAIKO_DOMAIN} addresses allowed` }
     if (!VALID_ROLES.includes(input.role))
       return { ok: false, error: "Invalid role" }
+
+    // An admin cannot pre-assign a role to their own email — that path was
+    // being used to sneak around the self-demotion block on profiles.
+    const { data: selfRow } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", profile.id)
+      .maybeSingle<{ email: string }>()
+    if (selfRow && selfRow.email.toLowerCase() === email) {
+      return {
+        ok: false,
+        error: "You cannot assign a role to yourself. Ask another admin.",
+      }
+    }
 
     const { error } = await supabase.from("role_assignments").upsert(
       {

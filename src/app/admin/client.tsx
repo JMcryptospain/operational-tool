@@ -11,10 +11,10 @@ import type { AppRole } from "@/lib/db-types"
 
 const ROLES: { value: AppRole; label: string }[] = [
   { value: "admin", label: "Admin" },
-  { value: "cto", label: "CTO (Gustavo)" },
-  { value: "coo", label: "COO (Joaquín)" },
-  { value: "legal_lead", label: "Legal Lead (Jonathan)" },
-  { value: "marketing_lead", label: "Marketing Lead (Tiffany)" },
+  { value: "cto", label: "CTO" },
+  { value: "coo", label: "COO" },
+  { value: "legal_lead", label: "Legal Lead" },
+  { value: "marketing_lead", label: "Marketing Lead" },
   { value: "cofounder", label: "Cofounder" },
   { value: "pm", label: "Product Manager" },
   { value: "engineer", label: "Engineer" },
