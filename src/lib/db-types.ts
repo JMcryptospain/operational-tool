@@ -8,13 +8,15 @@
 
 export type AppRole =
   | "admin"
-  | "pm"
-  | "engineer"
-  | "cto"
+  | "cofounder"
   | "coo"
+  | "cto"
   | "legal_lead"
   | "marketing_lead"
-  | "cofounder"
+  | "taiko_member"
+  // Deprecated (kept for existing DB rows; not offered in the UI)
+  | "pm"
+  | "engineer"
 
 export type AppStage =
   | "mvp"

@@ -69,7 +69,7 @@ export default async function AdminPage() {
           <p className="mt-1 text-sm text-[color:var(--color-fg-muted)]">
             Assign a role to each teammate. Roles gate the approval buttons:
             only the Legal Lead sees the legal approve button, only the CTO
-            can approve as Gustavo, etc.
+            can approve CTO checks, etc.
           </p>
         </header>
 

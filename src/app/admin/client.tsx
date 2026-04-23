@@ -9,16 +9,33 @@ import {
 } from "./actions"
 import type { AppRole } from "@/lib/db-types"
 
+/**
+ * Roles offered in the admin dropdown. "Admin" is intentionally hidden —
+ * it's a privileged ops role granted via SQL, not through the UI.
+ * "pm" and "engineer" are legacy enum values we don't offer anymore.
+ */
 const ROLES: { value: AppRole; label: string }[] = [
-  { value: "admin", label: "Admin" },
-  { value: "cto", label: "CTO" },
+  { value: "cofounder", label: "Co-founder" },
   { value: "coo", label: "COO" },
+  { value: "cto", label: "CTO" },
+  { value: "marketing_lead", label: "MKT Lead" },
   { value: "legal_lead", label: "Legal Lead" },
-  { value: "marketing_lead", label: "Marketing Lead" },
-  { value: "cofounder", label: "Cofounder" },
-  { value: "pm", label: "Product Manager" },
-  { value: "engineer", label: "Engineer" },
+  { value: "taiko_member", label: "Taiko Member" },
 ]
+
+/** Full label lookup, including hidden/legacy roles so we can render whatever
+ *  the DB has without surprising the user with a blank row. */
+const ROLE_LABELS: Record<AppRole, string> = {
+  admin: "Admin",
+  cofounder: "Co-founder",
+  coo: "COO",
+  cto: "CTO",
+  marketing_lead: "MKT Lead",
+  legal_lead: "Legal Lead",
+  taiko_member: "Taiko Member",
+  pm: "Taiko Member",
+  engineer: "Taiko Member",
+}
 
 const selectClass =
   "rounded border border-[color:var(--color-border)] bg-white px-2 py-1 text-sm text-[color:var(--color-fg)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--color-accent)] disabled:opacity-50"
@@ -51,6 +68,10 @@ export function ProfileRoleSelect({
     })
   }
 
+  const visibleRoles = ROLES.some((r) => r.value === value)
+    ? ROLES
+    : [{ value, label: ROLE_LABELS[value] ?? value }, ...ROLES]
+
   return (
     <div className="flex items-center gap-2">
       <select
@@ -60,7 +81,7 @@ export function ProfileRoleSelect({
         className={selectClass}
         title={isSelf ? "You cannot change your own role" : undefined}
       >
-        {ROLES.map((r) => (
+        {visibleRoles.map((r) => (
           <option key={r.value} value={r.value}>
             {r.label}
           </option>
@@ -78,7 +99,7 @@ export function ProfileRoleSelect({
 
 export function PreassignForm() {
   const [email, setEmail] = useState("")
-  const [role, setRole] = useState<AppRole>("engineer")
+  const [role, setRole] = useState<AppRole>("taiko_member")
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -93,9 +114,11 @@ export function PreassignForm() {
         setSuccess(null)
       } else {
         setEmail("")
-        setRole("engineer")
+        setRole("taiko_member")
         setError(null)
-        setSuccess(`Saved ${trimmed} as ${role}`)
+        setSuccess(
+          `Saved ${trimmed} as ${ROLE_LABELS[role] ?? role}`
+        )
       }
     })
   }
@@ -182,7 +205,7 @@ export function PreassignRow({
     })
   }
 
-  const label = ROLES.find((r) => r.value === role)?.label ?? role
+  const label = ROLE_LABELS[role] ?? role
 
   return (
     <tr className="border-b border-[color:var(--color-border)] last:border-b-0">
