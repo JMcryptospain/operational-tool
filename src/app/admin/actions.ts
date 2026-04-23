@@ -23,15 +23,18 @@ async function requireAdmin() {
   return { supabase, profile }
 }
 
+/**
+ * Operational roles the admin UI is allowed to assign. "admin" is managed
+ * via the is_admin flag, not here. Legacy values ("pm", "engineer") are
+ * intentionally excluded from what the UI can set going forward.
+ */
 const VALID_ROLES: AppRole[] = [
-  "admin",
-  "pm",
-  "engineer",
-  "cto",
+  "cofounder",
   "coo",
+  "cto",
   "legal_lead",
   "marketing_lead",
-  "cofounder",
+  "taiko_member",
 ]
 
 export async function updateProfileRole(input: {
