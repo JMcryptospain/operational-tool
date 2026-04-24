@@ -63,6 +63,9 @@ export type App = {
   monetization_setup_complete: boolean
   owner_tested_at: string | null
   posthog_project_id: string | null
+  posthog_project_url: string | null
+  posthog_host: string | null
+  analytics_wired_at: string | null
   current_stage: AppStage
   stage_entered_at: string
   ready_for_mainnet_window_start: string | null

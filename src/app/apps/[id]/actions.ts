@@ -96,7 +96,7 @@ async function autoAdvanceChain(
     const { data: app } = await supabase
       .from("apps")
       .select(
-        "name, current_stage, owner_tested_at, monetization_setup_complete"
+        "name, current_stage, owner_tested_at, monetization_setup_complete, analytics_wired_at"
       )
       .eq("id", appId)
       .maybeSingle<{
@@ -104,6 +104,7 @@ async function autoAdvanceChain(
         current_stage: AppStage
         owner_tested_at: string | null
         monetization_setup_complete: boolean
+        analytics_wired_at: string | null
       }>()
     if (!app) return
 
@@ -124,6 +125,7 @@ async function autoAdvanceChain(
       if (
         app.owner_tested_at &&
         app.monetization_setup_complete &&
+        app.analytics_wired_at &&
         legal?.status === "approved"
       ) {
         nextStage = "ready_for_mainnet"
@@ -185,6 +187,101 @@ async function autoAdvanceChain(
     } catch (e) {
       console.error("[email] notification failed for stage", nextStage, e)
     }
+  }
+}
+
+/**
+ * Wire PostHog analytics to an app. Parses the pasted URL, extracts the
+ * host + project id, marks analytics_wired_at if the URL is valid.
+ *
+ * Examples we accept:
+ *   https://eu.posthog.com/project/12345
+ *   https://app.posthog.com/project/12345
+ *   https://eu.posthog.com/project/12345/home
+ */
+export async function wireAnalytics(input: {
+  appId: string
+  url: string
+}): Promise<ActionResult> {
+  try {
+    const { supabase, profile } = await loadActor()
+
+    const { data: app } = await supabase
+      .from("apps")
+      .select("pm_id")
+      .eq("id", input.appId)
+      .maybeSingle<{ pm_id: string }>()
+    if (!app) return { ok: false, error: "App not found" }
+    if (app.pm_id !== profile.id) {
+      return { ok: false, error: "Only the owner can wire analytics" }
+    }
+
+    const raw = input.url.trim()
+    if (!raw) {
+      // Clear the wire
+      await supabase
+        .from("apps")
+        .update({
+          posthog_project_url: null,
+          posthog_project_id: null,
+          posthog_host: null,
+          analytics_wired_at: null,
+        })
+        .eq("id", input.appId)
+      revalidatePath(`/apps/${input.appId}`)
+      revalidatePath("/")
+      return { ok: true }
+    }
+
+    // Validate it looks like a PostHog project URL
+    let parsed: URL
+    try {
+      parsed = new URL(raw)
+    } catch {
+      return { ok: false, error: "That doesn't look like a URL" }
+    }
+    if (parsed.protocol !== "https:") {
+      return { ok: false, error: "URL must start with https://" }
+    }
+    const host = parsed.host.toLowerCase()
+    const isPosthogHost =
+      host === "eu.posthog.com" ||
+      host === "app.posthog.com" ||
+      host === "us.posthog.com" ||
+      host.endsWith(".posthog.com")
+    if (!isPosthogHost) {
+      return {
+        ok: false,
+        error: "URL must be a posthog.com project URL",
+      }
+    }
+    // Extract the project id from /project/<id>/...
+    const match = parsed.pathname.match(/\/project\/(\d+)/)
+    if (!match) {
+      return {
+        ok: false,
+        error: "URL must include /project/<id>",
+      }
+    }
+    const projectId = match[1]
+
+    const { error } = await supabase
+      .from("apps")
+      .update({
+        posthog_project_url: parsed.toString(),
+        posthog_project_id: projectId,
+        posthog_host: `https://${host}`,
+        analytics_wired_at: new Date().toISOString(),
+      })
+      .eq("id", input.appId)
+    if (error) return { ok: false, error: error.message }
+
+    await autoAdvanceChain(supabase, input.appId, profile.id)
+    revalidatePath(`/apps/${input.appId}`)
+    revalidatePath("/")
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
   }
 }
 

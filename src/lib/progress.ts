@@ -70,6 +70,7 @@ export function computeAppProgress(input: {
     | "monetization_setup_complete"
     | "owner_tested_at"
     | "launched_at"
+    | "analytics_wired_at"
   >
   approvals: ApprovalRow[]
   marketing: MarketingChecklist | null
@@ -139,6 +140,16 @@ export function computeAppProgress(input: {
         label: "Monetization setup",
         title: "Jonathan · Monetization setup completed",
         state: input.app.monetization_setup_complete
+          ? "done"
+          : rank >= 1
+            ? "pending"
+            : "not_started",
+      },
+      {
+        id: "analytics",
+        label: "Analytics wired",
+        title: "Owner · PostHog project linked",
+        state: input.app.analytics_wired_at
           ? "done"
           : rank >= 1
             ? "pending"

@@ -10,6 +10,7 @@ import {
   castApproval,
   advanceStage,
   setMarketingCheck,
+  wireAnalytics,
 } from "@/app/apps/[id]/actions"
 import type { AppStage } from "@/lib/db-types"
 import { cn } from "@/lib/utils"
@@ -204,6 +205,14 @@ function CheckAction({
           onUndo={() => setMonetizationOperative(appId, false)}
           label="Mark ready"
           confirmLabel="Ready"
+        />
+      )
+    if (check.id === "analytics")
+      return (
+        <AnalyticsWireField
+          appId={appId}
+          done={check.state === "done"}
+          isOwner={actor.isOwner}
         />
       )
   }
@@ -532,4 +541,94 @@ const NEXT_LABEL: Partial<Record<AppStage, string>> = {
   refining: "Refining",
   ready_for_mainnet: "Ready for Mainnet",
   launched: "Launched",
+}
+
+/**
+ * Analytics "Mark wired" widget. Owner pastes their PostHog project URL.
+ * We validate it server-side and stamp analytics_wired_at on success.
+ */
+function AnalyticsWireField({
+  appId,
+  done,
+  isOwner,
+}: {
+  appId: string
+  done: boolean
+  isOwner: boolean
+}) {
+  const [value, setValue] = useState("")
+  const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  if (done) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center gap-1 rounded bg-[color:var(--color-success-soft)] px-2 py-1 text-xs font-medium text-[color:var(--color-success)]">
+          <Check className="size-3" strokeWidth={3} /> Wired
+        </span>
+        {isOwner && (
+          <button
+            type="button"
+            onClick={() =>
+              startTransition(async () => {
+                const r = await wireAnalytics({ appId, url: "" })
+                if (!r.ok) setError(r.error ?? "Failed")
+              })
+            }
+            className="text-xs text-[color:var(--color-fg-subtle)] underline underline-offset-2 hover:text-[color:var(--color-fg)]"
+          >
+            Unlink
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  if (!isOwner) {
+    return (
+      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[color:var(--color-fg-subtle)]">
+        Only the owner
+      </span>
+    )
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex items-center gap-1.5">
+        <input
+          type="url"
+          inputMode="url"
+          autoComplete="url"
+          spellCheck={false}
+          placeholder="https://eu.posthog.com/project/…"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="w-64 rounded border border-[color:var(--color-border)] bg-white px-2 py-1 text-xs text-[color:var(--color-fg)] placeholder:text-[color:var(--color-fg-subtle)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--color-accent)]"
+        />
+        <button
+          type="button"
+          disabled={pending || !value.trim()}
+          onClick={() =>
+            startTransition(async () => {
+              const r = await wireAnalytics({ appId, url: value.trim() })
+              if (!r.ok) setError(r.error ?? "Failed")
+              else {
+                setValue("")
+                setError(null)
+              }
+            })
+          }
+          className="inline-flex items-center gap-1 rounded bg-[color:var(--color-accent)] px-2.5 py-1 text-xs font-medium text-white transition hover:bg-[color:var(--color-accent-strong)] disabled:opacity-50"
+        >
+          {pending && <Loader2 className="size-3 animate-spin" />}
+          Save
+        </button>
+      </div>
+      {error && (
+        <span className="text-[11px] text-[color:var(--color-danger)]">
+          {error}
+        </span>
+      )}
+    </div>
+  )
 }
