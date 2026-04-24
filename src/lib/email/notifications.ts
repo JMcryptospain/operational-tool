@@ -144,6 +144,90 @@ export async function notifyApprovedToLaunch(
   })
 }
 
+/* ================== Trigger 5 · RFM timer warning (≤12h left) ================== */
+
+/**
+ * Reminder for RFM approvers who haven't decided yet and have <12 business
+ * hours remaining in the 48h window. missingRoles is the subset of
+ * ("cto", "coo") that still needs to act.
+ */
+export async function notifyRFMWarning(input: {
+  appId: string
+  appName: string
+  missingRoles: Array<"cto" | "coo">
+  hoursRemaining: number
+}): Promise<SendResult | null> {
+  if (input.missingRoles.length === 0) return null
+  const to = await emailsForRoles(input.missingRoles as AppRole[])
+  if (to.length === 0) return null
+  const href = appUrl(`/apps/${input.appId}`)
+  const { html, text } = layout({
+    preheader: `Less than ${input.hoursRemaining}h left on ${input.appName}.`,
+    heading: `Reminder: ${input.appName} is still waiting on you`,
+    intro: `The 48h review window is closing. Please approve or reject so this doesn't fall past the deadline.`,
+    meta: [
+      ["App", input.appName],
+      ["Phase", "Ready for Mainnet"],
+      [
+        "Remaining",
+        `${input.hoursRemaining} business hour${
+          input.hoursRemaining === 1 ? "" : "s"
+        }`,
+      ],
+    ],
+    ctaLabel: "Review now",
+    ctaHref: href,
+  })
+  return sendEmail({
+    to,
+    subject: `Reminder: ${input.appName} still needs your approval`,
+    html,
+    text,
+  })
+}
+
+/* ================== Trigger 6 · RFM timer expired — escalate ================== */
+
+/**
+ * The 48h review window passed without both approvers acting. We escalate
+ * to cofounders AND notify the owner.
+ */
+export async function notifyRFMExpired(input: {
+  appId: string
+  appName: string
+  missingRoles: Array<"cto" | "coo">
+}): Promise<SendResult | null> {
+  const cofounders = await emailsForRoles(["cofounder"])
+  const owner = await ownerEmail(input.appId)
+  const to = Array.from(new Set([...cofounders, owner].filter(Boolean) as string[]))
+  if (to.length === 0) return null
+  const href = appUrl(`/apps/${input.appId}`)
+  const missingLabel = input.missingRoles
+    .map((r) => (r === "cto" ? "Gustavo" : "Joaquín"))
+    .join(" and ")
+  const { html, text } = layout({
+    preheader: `48h approval window expired without a decision.`,
+    heading: `Escalation: ${input.appName} is stuck in Ready for Mainnet`,
+    intro: `The 48h approval window has closed and ${missingLabel || "one or both approvers"} did not act. Cofounders have been looped in so this doesn't fall through.`,
+    meta: [
+      ["App", input.appName],
+      ["Phase", "Ready for Mainnet"],
+      ["Status", "Window expired"],
+      ["Missing", missingLabel || "unknown"],
+    ],
+    ctaLabel: "Investigate",
+    ctaHref: href,
+    footerNote:
+      "Escalated because the regular approvers did not act within 48 business hours.",
+  })
+  return sendEmail({
+    to,
+    subject: `Escalation: ${input.appName} is stuck in Ready for Mainnet`,
+    html,
+    text,
+  })
+}
+
 /* ================== Trigger 4 · Launched — Marketing Lead ================== */
 
 export async function notifyLaunched(
