@@ -184,6 +184,126 @@ export async function notifyRFMExpired(
   })
 }
 
+/** Fired when the owner confirms "I've tested it" — pings Legal Lead. */
+export async function notifyOwnerTested(
+  ctx: AppEmailCtx
+): Promise<SendResult | null> {
+  const to = await emailsForRoles(["legal_lead"])
+  if (to.length === 0) return null
+  const href = appUrl(`/apps/${ctx.appId}`)
+  const { html, text } = layout({
+    preheader: `${ctx.appName} is ready for your legal review.`,
+    heading: `Ready for legal review: ${ctx.appName}`,
+    intro: `The owner has confirmed the app has been tested end-to-end. You can now do the high-level legal review.`,
+    meta: [
+      ["App", ctx.appName],
+      ["Phase", "Refining & Legal"],
+      ["Your role", "Legal Lead"],
+    ],
+    ctaLabel: "Review app",
+    ctaHref: href,
+  })
+  return sendEmail({
+    to,
+    subject: `Ready for legal review: ${ctx.appName}`,
+    html,
+    text,
+  })
+}
+
+/** Fired when the owner marks monetization operative — pings Legal Lead. */
+export async function notifyMonetizationReady(
+  ctx: AppEmailCtx
+): Promise<SendResult | null> {
+  const to = await emailsForRoles(["legal_lead"])
+  if (to.length === 0) return null
+  const href = appUrl(`/apps/${ctx.appId}`)
+  const { html, text } = layout({
+    preheader: `Monetization is marked operationally ready.`,
+    heading: `Monetization ready on ${ctx.appName}`,
+    intro: `The payments wiring is now operational. Worth a glance in case anything stands out for legal.`,
+    meta: [
+      ["App", ctx.appName],
+      ["Phase", "Refining & Legal"],
+    ],
+    ctaLabel: "Open app",
+    ctaHref: href,
+  })
+  return sendEmail({
+    to,
+    subject: `Monetization operational: ${ctx.appName}`,
+    html,
+    text,
+  })
+}
+
+/** Fired after any approval / rejection — notifies the owner. */
+export async function notifyApprovalDecision(input: {
+  appId: string
+  appName: string
+  decider: { name: string; role: "cto" | "coo" | "legal_lead" }
+  decision: "approved" | "rejected"
+  comment?: string | null
+}): Promise<SendResult | null> {
+  const to = await ownerEmail(input.appId)
+  if (!to) return null
+  const href = appUrl(`/apps/${input.appId}`)
+  const roleLabel =
+    input.decider.role === "cto"
+      ? "CTO"
+      : input.decider.role === "coo"
+        ? "COO"
+        : "Legal Lead"
+  const verb = input.decision === "approved" ? "approved" : "rejected"
+  const { html, text } = layout({
+    preheader: `${input.decider.name} ${verb} ${input.appName}.`,
+    heading: `${input.decider.name} ${verb} ${input.appName}`,
+    intro: input.comment
+      ? `They left a comment: "${input.comment}"`
+      : `No comment was attached.`,
+    meta: [
+      ["App", input.appName],
+      ["Decision", input.decision === "approved" ? "Approved" : "Rejected"],
+      ["Approver", `${input.decider.name} (${roleLabel})`],
+    ],
+    ctaLabel: "Open app",
+    ctaHref: href,
+  })
+  return sendEmail({
+    to,
+    subject: `${input.decider.name} ${verb} ${input.appName}`,
+    html,
+    text,
+  })
+}
+
+/** Fired when every MKT Basic check is done — notifies the owner. */
+export async function notifyMktCompleted(
+  ctx: AppEmailCtx
+): Promise<SendResult | null> {
+  const to = await ownerEmail(ctx.appId)
+  if (!to) return null
+  const href = appUrl(`/apps/${ctx.appId}`)
+  const { html, text } = layout({
+    preheader: `The MKT Basic package is complete.`,
+    heading: `${ctx.appName}: MKT Basic complete`,
+    intro: `The marketing team has finished all five deliverables: tweet, article, video, AI listings, and media pitch.`,
+    meta: [
+      ["App", ctx.appName],
+      ["Phase", "Launched"],
+      ["Status", "MKT Basic 100% done"],
+    ],
+    ctaLabel: "View app",
+    ctaHref: href,
+  })
+  return sendEmail({
+    to,
+    subject: `${ctx.appName}: MKT Basic complete`,
+    html,
+    text,
+  })
+}
+
 /** Fired when the app transitions into Launched — notifies Marketing Lead. */
 export async function notifyLaunched(
   ctx: AppEmailCtx

@@ -9,9 +9,13 @@ import type {
   ApprovalStatus,
 } from "@/lib/db-types"
 import {
+  notifyApprovalDecision,
   notifyEnteredRefining,
   notifyEnteredRFM,
   notifyLaunched,
+  notifyMktCompleted,
+  notifyMonetizationReady,
+  notifyOwnerTested,
 } from "@/lib/email/notifications"
 
 type ActionResult = { ok: true } | { ok: false; error: string }
@@ -208,6 +212,12 @@ export async function markOwnerTested(appId: string): Promise<ActionResult> {
       }
     }
 
+    const { data: full } = await supabase
+      .from("apps")
+      .select("name")
+      .eq("id", appId)
+      .maybeSingle<{ name: string }>()
+
     const { error } = await supabase
       .from("apps")
       .update({ owner_tested_at: new Date().toISOString() })
@@ -215,6 +225,13 @@ export async function markOwnerTested(appId: string): Promise<ActionResult> {
     if (error) return { ok: false, error: error.message }
 
     await autoAdvanceChain(supabase, appId, profile.id)
+    try {
+      if (full?.name) {
+        await notifyOwnerTested({ appId, appName: full.name })
+      }
+    } catch (e) {
+      console.error("[email] owner-tested notification failed", e)
+    }
     revalidatePath(`/apps/${appId}`)
     revalidatePath("/")
     return { ok: true }
@@ -241,13 +258,28 @@ export async function setMonetizationOperative(
       profile.role === "legal_lead" || profile.id === app.pm_id
     if (!allowed) return { ok: false, error: "Not authorized" }
 
+    const { data: full } = await supabase
+      .from("apps")
+      .select("name")
+      .eq("id", appId)
+      .maybeSingle<{ name: string }>()
+
     const { error } = await supabase
       .from("apps")
       .update({ monetization_setup_complete: value })
       .eq("id", appId)
     if (error) return { ok: false, error: error.message }
 
-    if (value) await autoAdvanceChain(supabase, appId, profile.id)
+    if (value) {
+      await autoAdvanceChain(supabase, appId, profile.id)
+      try {
+        if (full?.name) {
+          await notifyMonetizationReady({ appId, appName: full.name })
+        }
+      } catch (e) {
+        console.error("[email] monetization-ready notification failed", e)
+      }
+    }
     revalidatePath(`/apps/${appId}`)
     revalidatePath("/")
     return { ok: true }
@@ -286,6 +318,30 @@ export async function castApproval(input: {
 
     if (input.decision === "approved")
       await autoAdvanceChain(supabase, input.appId, profile.id)
+
+    // Tell the owner somebody decided
+    try {
+      const { data: app } = await supabase
+        .from("apps")
+        .select("name")
+        .eq("id", input.appId)
+        .maybeSingle<{ name: string }>()
+      if (app?.name) {
+        await notifyApprovalDecision({
+          appId: input.appId,
+          appName: app.name,
+          decider: {
+            name: profile.full_name ?? profile.email ?? "Someone",
+            role: input.approverRole,
+          },
+          decision: input.decision,
+          comment: input.comment,
+        })
+      }
+    } catch (e) {
+      console.error("[email] approval-decision notification failed", e)
+    }
+
     revalidatePath(`/apps/${input.appId}`)
     revalidatePath("/")
     return { ok: true }
@@ -428,7 +484,12 @@ export async function advanceStage(input: {
 
 /* --- Marketing checks (Tiffany/Marketing Lead) --- */
 
-type MarketingField = "promoted_tweet" | "proving_ground_article" | "video"
+type MarketingField =
+  | "promoted_tweet"
+  | "proving_ground_article"
+  | "video"
+  | "ai_product_listings"
+  | "media_pitch"
 
 export async function setMarketingCheck(input: {
   appId: string
@@ -466,6 +527,51 @@ export async function setMarketingCheck(input: {
         .from("marketing_checklist")
         .insert(insert)
       if (error) return { ok: false, error: error.message }
+    }
+
+    // If this flip completes every MKT check, notify the owner exactly once
+    // (we derive that by reading the row back and checking all 5 flags).
+    if (input.value) {
+      try {
+        const { data: row } = await supabase
+          .from("marketing_checklist")
+          .select(
+            "promoted_tweet, proving_ground_article, video, ai_product_listings, media_pitch"
+          )
+          .eq("app_id", input.appId)
+          .maybeSingle<{
+            promoted_tweet: boolean
+            proving_ground_article: boolean
+            video: boolean
+            ai_product_listings: boolean
+            media_pitch: boolean
+          }>()
+        const allDone =
+          row &&
+          row.promoted_tweet &&
+          row.proving_ground_article &&
+          row.video &&
+          row.ai_product_listings &&
+          row.media_pitch
+        if (allDone) {
+          const { data: app } = await supabase
+            .from("apps")
+            .select("name")
+            .eq("id", input.appId)
+            .maybeSingle<{ name: string }>()
+          if (app?.name) {
+            await notifyMktCompleted({ appId: input.appId, appName: app.name })
+            // stamp completed_at so we don't re-send if someone toggles
+            await supabase
+              .from("marketing_checklist")
+              .update({ completed_at: new Date().toISOString() })
+              .eq("app_id", input.appId)
+              .is("completed_at", null)
+          }
+        }
+      } catch (e) {
+        console.error("[email] mkt-completed notification failed", e)
+      }
     }
 
     revalidatePath(`/apps/${input.appId}`)

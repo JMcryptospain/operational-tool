@@ -236,7 +236,11 @@ function CheckAction({
           ? "proving_ground_article"
           : check.id === "video"
             ? "video"
-            : null
+            : check.id === "ai_listings"
+              ? "ai_product_listings"
+              : check.id === "media"
+                ? "media_pitch"
+                : null
     if (field) {
       return (
         <AsyncButton

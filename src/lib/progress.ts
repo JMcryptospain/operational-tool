@@ -186,15 +186,22 @@ export function computeAppProgress(input: {
   const mktCheckState = (flag: boolean): CheckState =>
     flag ? "done" : rank >= 3 ? "pending" : "not_started"
 
+  const allMktDone = Boolean(
+    mkt &&
+      mkt.promoted_tweet &&
+      mkt.proving_ground_article &&
+      mkt.video &&
+      mkt.ai_product_listings &&
+      mkt.media_pitch
+  )
   const mktPhase: Phase = {
     key: "mkt",
     label: "MKT Basic",
-    state:
-      mkt && mkt.promoted_tweet && mkt.proving_ground_article && mkt.video
-        ? "completed"
-        : rank >= 3
-          ? "active"
-          : "pending",
+    state: allMktDone
+      ? "completed"
+      : rank >= 3
+        ? "active"
+        : "pending",
     checks: [
       {
         id: "tweet",
@@ -212,6 +219,18 @@ export function computeAppProgress(input: {
         id: "video",
         label: "Video",
         state: mktCheckState(mkt?.video ?? false),
+      },
+      {
+        id: "ai_listings",
+        label: "AI listings",
+        title: "AI product listings (Product Hunt, TAIAT, etc.)",
+        state: mktCheckState(mkt?.ai_product_listings ?? false),
+      },
+      {
+        id: "media",
+        label: "Media",
+        title: "Pitch to media contacts",
+        state: mktCheckState(mkt?.media_pitch ?? false),
       },
     ],
   }

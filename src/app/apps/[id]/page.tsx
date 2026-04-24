@@ -63,7 +63,7 @@ export default async function AppDetailPage({
           `*,
          pm:profiles!apps_pm_id_fkey(id, full_name, email),
          approvals(approver_role, status),
-         marketing_checklist(id, app_id, promoted_tweet, proving_ground_article, video, completed_at)`
+         marketing_checklist(id, app_id, promoted_tweet, proving_ground_article, video, ai_product_listings, media_pitch, completed_at)`
         )
         .eq("id", id)
         .maybeSingle<AppDetail>(),
