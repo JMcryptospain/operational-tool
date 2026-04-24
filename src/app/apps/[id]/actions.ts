@@ -8,6 +8,11 @@ import type {
   ApproverRole,
   ApprovalStatus,
 } from "@/lib/db-types"
+import {
+  notifyEnteredRefining,
+  notifyEnteredRFM,
+  notifyLaunched,
+} from "@/lib/email/notifications"
 
 type ActionResult = { ok: true } | { ok: false; error: string }
 
@@ -90,10 +95,11 @@ async function autoAdvanceChain(
     const { data: app } = await supabase
       .from("apps")
       .select(
-        "current_stage, owner_tested_at, monetization_setup_complete"
+        "name, current_stage, owner_tested_at, monetization_setup_complete"
       )
       .eq("id", appId)
       .maybeSingle<{
+        name: string
         current_stage: AppStage
         owner_tested_at: string | null
         monetization_setup_complete: boolean
@@ -155,6 +161,21 @@ async function autoAdvanceChain(
       actorId,
       "Auto-advanced: all exit criteria met"
     )
+
+    // Fire and forget email notification for the new stage. Failures are
+    // logged inside sendEmail but must never block the stage transition.
+    const emailCtx = { appId, appName: app.name }
+    try {
+      if (nextStage === "refining") {
+        await notifyEnteredRefining(emailCtx)
+      } else if (nextStage === "ready_for_mainnet") {
+        await notifyEnteredRFM(emailCtx)
+      } else if (nextStage === "launched") {
+        await notifyLaunched(emailCtx)
+      }
+    } catch (e) {
+      console.error("[email] notification failed for stage", nextStage, e)
+    }
   }
 }
 

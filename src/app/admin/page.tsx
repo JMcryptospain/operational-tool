@@ -7,6 +7,7 @@ import {
   PreassignForm,
   PreassignRow,
   ProfileRoleSelect,
+  SendTestEmailButton,
 } from "./client"
 
 type PreassignmentRow = {
@@ -64,15 +65,18 @@ export default async function AdminPage() {
       <TopNav profile={profile ?? null} fallbackEmail={user.email ?? ""} />
 
       <main className="mx-auto w-full max-w-5xl px-6 py-8 lg:px-10">
-        <header className="mb-6">
-          <h1 className="text-2xl font-semibold text-[color:var(--color-fg)]">
-            Admin · Team roles
-          </h1>
-          <p className="mt-1 text-sm text-[color:var(--color-fg-muted)]">
-            Assign a role to each teammate. Roles gate the approval buttons:
-            only the Legal Lead sees the legal approve button, only the CTO
-            can approve CTO checks, etc.
-          </p>
+        <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-[color:var(--color-fg)]">
+              Admin · Team roles
+            </h1>
+            <p className="mt-1 text-sm text-[color:var(--color-fg-muted)]">
+              Assign a role to each teammate. Roles gate the approval buttons:
+              only the Legal Lead sees the legal approve button, only the CTO
+              can approve CTO checks, etc.
+            </p>
+          </div>
+          <SendTestEmailButton />
         </header>
 
         {/* Existing profiles */}

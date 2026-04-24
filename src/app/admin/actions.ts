@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import type { AppRole } from "@/lib/db-types"
+import { sendTestEmail } from "@/lib/email/notifications"
 
 type Result = { ok: true } | { ok: false; error: string }
 
@@ -14,9 +15,14 @@ async function requireAdmin() {
   if (!user) throw new Error("Not authenticated")
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, is_admin")
+    .select("id, role, is_admin, email")
     .eq("id", user.id)
-    .maybeSingle<{ id: string; role: AppRole; is_admin: boolean }>()
+    .maybeSingle<{
+      id: string
+      role: AppRole
+      is_admin: boolean
+      email: string
+    }>()
   if (!profile || !profile.is_admin) {
     throw new Error("Admin only")
   }
@@ -109,6 +115,21 @@ export async function deletePreassignment(email: string): Promise<Result> {
     if (error) return { ok: false, error: error.message }
     revalidatePath("/admin")
     return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * Send a one-off test email to the acting admin. Lets us verify the Resend
+ * integration end-to-end from the admin panel without waiting for a real
+ * stage transition.
+ */
+export async function sendAdminTestEmail(): Promise<Result> {
+  try {
+    const { profile } = await requireAdmin()
+    const r = await sendTestEmail(profile.email)
+    return r.ok ? { ok: true } : { ok: false, error: r.error }
   } catch (e) {
     return { ok: false, error: (e as Error).message }
   }

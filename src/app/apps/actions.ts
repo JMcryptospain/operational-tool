@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import type { MonetizationModel } from "@/lib/db-types"
+import { notifyAppSubmitted } from "@/lib/email/notifications"
 
 export type CreateAppState = {
   status: "idle" | "error" | "success"
@@ -113,6 +114,14 @@ export async function createApp(
     actor_id: user.id,
     notes: "App submitted as MVP.",
   })
+
+  // Send a confirmation email to the owner. Failures are logged but must
+  // never prevent the redirect below.
+  try {
+    await notifyAppSubmitted({ appId: inserted.id, appName: name })
+  } catch (e) {
+    console.error("[email] submit notification failed", e)
+  }
 
   revalidatePath("/")
   redirect(`/apps/${inserted.id}`)

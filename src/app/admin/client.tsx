@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Loader2, Trash2 } from "lucide-react"
+import { CheckCircle2, Loader2, Mail, Trash2 } from "lucide-react"
 import {
   deletePreassignment,
   preassignRole,
+  sendAdminTestEmail,
   updateProfileRole,
 } from "./actions"
 import type { AppRole } from "@/lib/db-types"
@@ -184,6 +185,51 @@ export function PreassignForm() {
         </span>
       )}
     </form>
+  )
+}
+
+export function SendTestEmailButton() {
+  const [pending, startTransition] = useTransition()
+  const [result, setResult] = useState<
+    { kind: "ok" } | { kind: "error"; error: string } | null
+  >(null)
+
+  const send = () => {
+    setResult(null)
+    startTransition(async () => {
+      const r = await sendAdminTestEmail()
+      if (r.ok) setResult({ kind: "ok" })
+      else setResult({ kind: "error", error: r.error ?? "Failed" })
+    })
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <button
+        type="button"
+        onClick={send}
+        disabled={pending}
+        className="inline-flex items-center gap-1.5 rounded border border-[color:var(--color-border)] bg-white px-2.5 py-1.5 text-xs font-medium text-[color:var(--color-fg)] transition hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)] disabled:opacity-50"
+      >
+        {pending ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Mail className="size-3.5" />
+        )}
+        Send test email
+      </button>
+      {result?.kind === "ok" && (
+        <span className="inline-flex items-center gap-1 text-xs text-[color:var(--color-success)]">
+          <CheckCircle2 className="size-3.5" />
+          Sent. Check your inbox.
+        </span>
+      )}
+      {result?.kind === "error" && (
+        <span className="text-xs text-[color:var(--color-danger)]">
+          {result.error}
+        </span>
+      )}
+    </div>
   )
 }
 
