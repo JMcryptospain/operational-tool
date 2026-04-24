@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation"
 import { ArrowLeft, ExternalLink, Code2 } from "lucide-react"
 
 import { reconcileAppStage } from "@/app/apps/[id]/actions"
+import { AdoptionCards } from "@/components/adoption-cards"
 import { AnalyticsSnippet } from "@/components/analytics-snippet"
 import {
   CommentsThread,
@@ -19,6 +20,7 @@ import type {
   ApprovalRow,
   MarketingChecklist,
 } from "@/lib/db-types-extra"
+import { fetchAppMetrics, isPosthogConfigured } from "@/lib/posthog"
 import { computeAppProgress } from "@/lib/progress"
 import { MONETIZATION_LABELS, STAGE_LABELS } from "@/lib/stages"
 import { createClient } from "@/lib/supabase/server"
@@ -95,6 +97,15 @@ export default async function AppDetailPage({
   const commentTree = buildCommentTree(commentsRaw ?? [])
 
   if (!app) notFound()
+
+  // Fire PostHog metrics in parallel with render. We don't await this at
+  // the top of the function because it's an external service and we don't
+  // want it to delay the whole page — so we pass the promise down and use
+  // it only where needed. With Next revalidate=300 it's cached for 5 min.
+  const metricsPromise =
+    app.analytics_wired_at && isPosthogConfigured()
+      ? fetchAppMetrics(app.slug)
+      : Promise.resolve(null)
 
   const progress = computeAppProgress({
     app,
@@ -224,10 +235,32 @@ export default async function AppDetailPage({
           )}
         </header>
 
+        {/* Adoption metrics — visible to everyone once live is flipped */}
+        <div className="mb-4">
+          <AdoptionCards
+            metrics={await metricsPromise}
+            analyticsWired={Boolean(app.analytics_wired_at)}
+            posthogHost={
+              process.env.NEXT_PUBLIC_POSTHOG_HOST ??
+              "https://eu.posthog.com"
+            }
+            slug={app.slug}
+          />
+        </div>
+
         {/* Analytics snippet — visible to the owner only */}
         {actor.isOwner && (
           <div className="mb-4">
-            <AnalyticsSnippet slug={app.slug} />
+            <AnalyticsSnippet
+              slug={app.slug}
+              posthogToken={
+                process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN ?? ""
+              }
+              posthogHost={
+                process.env.NEXT_PUBLIC_POSTHOG_HOST ??
+                "https://eu.posthog.com"
+              }
+            />
           </div>
         )}
 
