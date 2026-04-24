@@ -123,20 +123,20 @@ export function computeAppProgress(input: {
     checks: [
       {
         id: "owner_tested",
-        label: "Owner tested",
-        title: "Owner has tested end-to-end",
+        label: "Tested end-to-end",
+        title: "Owner · App is refined and ready for mainnet",
         state: ownerTested,
       },
       {
         id: "legal",
-        label: "Legal",
+        label: "Legal review",
         title: "Jonathan · High-level legal review",
         state: approvalCheck("legal_lead", 1),
       },
       {
         id: "monet",
-        label: "Monet. operative",
-        title: "Monetization operationally ready",
+        label: "Monetization setup",
+        title: "Jonathan · Monetization setup completed",
         state: input.app.monetization_setup_complete
           ? "done"
           : rank >= 1

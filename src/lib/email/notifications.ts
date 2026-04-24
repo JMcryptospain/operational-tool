@@ -4,12 +4,19 @@ import { layout } from "./templates"
 import type { AppRole } from "@/lib/db-types"
 
 /**
- * High-level notification helpers. Each function is tolerant of missing
- * recipients — if the matching role isn't assigned yet, we skip instead of
- * throwing, so app-pipeline transitions never fail because of email.
+ * Email notification helpers.
  *
- * All of these use a server-only Supabase client with the service role key
- * so they can read profiles regardless of the caller's RLS context.
+ * Final list of triggers (per product decision):
+ *  - notifyEnteredRFM        -> CTO + COO  (approve call-to-action)
+ *  - notifyEnteredRFMOwner   -> Owner      (heads-up that escalation happened)
+ *  - notifyApprovedToLaunch  -> Owner      (both approvers signed off)
+ *  - notifyLaunched          -> MKT Lead   (time to run the MKT package)
+ *
+ * Everything else (owner tested, legal approved, monet marked,
+ * individual approve/reject, MKT completed, submit) is intentionally
+ * silent — the UI shows the state, no inbox noise.
+ *
+ * Also exposed: sendTestEmail and notifyAppSubmitted as dormant helpers.
  */
 
 function adminClient() {
@@ -26,7 +33,6 @@ function adminClient() {
 type AppEmailCtx = {
   appId: string
   appName: string
-  ownerName?: string | null
 }
 
 async function emailsForRoles(roles: AppRole[]): Promise<string[]> {
@@ -48,58 +54,8 @@ async function ownerEmail(appId: string): Promise<string | null> {
   return data?.pm?.email ?? null
 }
 
-/* ============================= triggers ============================= */
+/* ================== Trigger 1 · App enters RFM — approvers ================== */
 
-/** Fired right after a PM submits a new app. */
-export async function notifyAppSubmitted(
-  ctx: AppEmailCtx
-): Promise<SendResult | null> {
-  const to = await ownerEmail(ctx.appId)
-  if (!to) return null
-  const href = appUrl(`/apps/${ctx.appId}`)
-  const { html, text } = layout({
-    preheader: `${ctx.appName} is in the pipeline.`,
-    heading: `${ctx.appName} is in the pipeline`,
-    intro: `You submitted ${ctx.appName}. Take it through the five phases on Taiko Launchpad.`,
-    meta: [
-      ["App", ctx.appName],
-      ["Stage", "MVP"],
-      ["Next step", "Refining & Legal"],
-    ],
-    ctaLabel: "Open app",
-    ctaHref: href,
-  })
-  return sendEmail({ to, subject: `${ctx.appName} is in the pipeline`, html, text })
-}
-
-/** Fired when an app enters Refining — Jonathan (legal_lead) is the actor. */
-export async function notifyEnteredRefining(
-  ctx: AppEmailCtx
-): Promise<SendResult | null> {
-  const to = await emailsForRoles(["legal_lead"])
-  if (to.length === 0) return null
-  const href = appUrl(`/apps/${ctx.appId}`)
-  const { html, text } = layout({
-    preheader: `Legal review needed for ${ctx.appName}.`,
-    heading: `Legal review needed: ${ctx.appName}`,
-    intro: `${ctx.appName} has entered the Refining & Legal phase. Please do a high-level legal review and confirm monetization is operationally ready.`,
-    meta: [
-      ["App", ctx.appName],
-      ["Phase", "Refining & Legal"],
-      ["Your role", "Legal Lead"],
-    ],
-    ctaLabel: "Review app",
-    ctaHref: href,
-  })
-  return sendEmail({
-    to,
-    subject: `Legal review needed: ${ctx.appName}`,
-    html,
-    text,
-  })
-}
-
-/** Fired when an app enters Ready for Mainnet — notifies Gustavo + Joaquín. */
 export async function notifyEnteredRFM(
   ctx: AppEmailCtx
 ): Promise<SendResult | null> {
@@ -108,8 +64,8 @@ export async function notifyEnteredRFM(
   const href = appUrl(`/apps/${ctx.appId}`)
   const { html, text } = layout({
     preheader: `Your approval is needed within 48h.`,
-    heading: `${ctx.appName}: ready for your approval`,
-    intro: `The app is ready to ship to mainnet. You have 48 business hours to approve or reject.`,
+    heading: `${ctx.appName}: Ready for Mainnet`,
+    intro: `The app has cleared Refining & Legal. Please review and approve or reject within 48 business hours so it can ship to mainnet.`,
     meta: [
       ["App", ctx.appName],
       ["Phase", "Ready for Mainnet"],
@@ -126,185 +82,64 @@ export async function notifyEnteredRFM(
   })
 }
 
-/** Fired when the 48h window has <12h remaining and an approver hasn't acted. */
-export async function notifyRFMWarning(
-  ctx: AppEmailCtx,
-  missingRoles: Array<"cto" | "coo">
-): Promise<SendResult | null> {
-  if (missingRoles.length === 0) return null
-  const to = await emailsForRoles(missingRoles as AppRole[])
-  if (to.length === 0) return null
-  const href = appUrl(`/apps/${ctx.appId}`)
-  const { html, text } = layout({
-    preheader: `Less than 12h left to approve ${ctx.appName}.`,
-    heading: `Reminder: ${ctx.appName} needs your approval`,
-    intro: `Less than 12 business hours remain in the 48h review window. Please approve or reject so this doesn't get stuck.`,
-    meta: [
-      ["App", ctx.appName],
-      ["Phase", "Ready for Mainnet"],
-      ["Status", "< 12h remaining"],
-    ],
-    ctaLabel: "Review now",
-    ctaHref: href,
-  })
-  return sendEmail({
-    to,
-    subject: `Reminder: ${ctx.appName} needs your approval`,
-    html,
-    text,
-  })
-}
+/* ================== Trigger 2 · App enters RFM — owner heads-up ================== */
 
-/** Fired when the 48h window has expired — escalate to cofounders. */
-export async function notifyRFMExpired(
-  ctx: AppEmailCtx
-): Promise<SendResult | null> {
-  const to = await emailsForRoles(["cofounder"])
-  if (to.length === 0) return null
-  const href = appUrl(`/apps/${ctx.appId}`)
-  const { html, text } = layout({
-    preheader: `48h window expired without approval.`,
-    heading: `Escalation: ${ctx.appName} is stuck`,
-    intro: `The 48h approval window for ${ctx.appName} has expired without a decision. You're being looped in as a cofounder so this doesn't fall through.`,
-    meta: [
-      ["App", ctx.appName],
-      ["Phase", "Ready for Mainnet"],
-      ["Status", "Window expired"],
-    ],
-    ctaLabel: "Investigate",
-    ctaHref: href,
-    footerNote:
-      "Escalated to cofounders because the regular approvers did not act in time.",
-  })
-  return sendEmail({
-    to,
-    subject: `Escalation: ${ctx.appName} is stuck in Ready for Mainnet`,
-    html,
-    text,
-  })
-}
-
-/** Fired when the owner confirms "I've tested it" — pings Legal Lead. */
-export async function notifyOwnerTested(
-  ctx: AppEmailCtx
-): Promise<SendResult | null> {
-  const to = await emailsForRoles(["legal_lead"])
-  if (to.length === 0) return null
-  const href = appUrl(`/apps/${ctx.appId}`)
-  const { html, text } = layout({
-    preheader: `${ctx.appName} is ready for your legal review.`,
-    heading: `Ready for legal review: ${ctx.appName}`,
-    intro: `The owner has confirmed the app has been tested end-to-end. You can now do the high-level legal review.`,
-    meta: [
-      ["App", ctx.appName],
-      ["Phase", "Refining & Legal"],
-      ["Your role", "Legal Lead"],
-    ],
-    ctaLabel: "Review app",
-    ctaHref: href,
-  })
-  return sendEmail({
-    to,
-    subject: `Ready for legal review: ${ctx.appName}`,
-    html,
-    text,
-  })
-}
-
-/** Fired when the owner marks monetization operative — pings Legal Lead. */
-export async function notifyMonetizationReady(
-  ctx: AppEmailCtx
-): Promise<SendResult | null> {
-  const to = await emailsForRoles(["legal_lead"])
-  if (to.length === 0) return null
-  const href = appUrl(`/apps/${ctx.appId}`)
-  const { html, text } = layout({
-    preheader: `Monetization is marked operationally ready.`,
-    heading: `Monetization ready on ${ctx.appName}`,
-    intro: `The payments wiring is now operational. Worth a glance in case anything stands out for legal.`,
-    meta: [
-      ["App", ctx.appName],
-      ["Phase", "Refining & Legal"],
-    ],
-    ctaLabel: "Open app",
-    ctaHref: href,
-  })
-  return sendEmail({
-    to,
-    subject: `Monetization operational: ${ctx.appName}`,
-    html,
-    text,
-  })
-}
-
-/** Fired after any approval / rejection — notifies the owner. */
-export async function notifyApprovalDecision(input: {
-  appId: string
-  appName: string
-  decider: { name: string; role: "cto" | "coo" | "legal_lead" }
-  decision: "approved" | "rejected"
-  comment?: string | null
-}): Promise<SendResult | null> {
-  const to = await ownerEmail(input.appId)
-  if (!to) return null
-  const href = appUrl(`/apps/${input.appId}`)
-  const roleLabel =
-    input.decider.role === "cto"
-      ? "CTO"
-      : input.decider.role === "coo"
-        ? "COO"
-        : "Legal Lead"
-  const verb = input.decision === "approved" ? "approved" : "rejected"
-  const { html, text } = layout({
-    preheader: `${input.decider.name} ${verb} ${input.appName}.`,
-    heading: `${input.decider.name} ${verb} ${input.appName}`,
-    intro: input.comment
-      ? `They left a comment: "${input.comment}"`
-      : `No comment was attached.`,
-    meta: [
-      ["App", input.appName],
-      ["Decision", input.decision === "approved" ? "Approved" : "Rejected"],
-      ["Approver", `${input.decider.name} (${roleLabel})`],
-    ],
-    ctaLabel: "Open app",
-    ctaHref: href,
-  })
-  return sendEmail({
-    to,
-    subject: `${input.decider.name} ${verb} ${input.appName}`,
-    html,
-    text,
-  })
-}
-
-/** Fired when every MKT Basic check is done — notifies the owner. */
-export async function notifyMktCompleted(
+export async function notifyEnteredRFMOwner(
   ctx: AppEmailCtx
 ): Promise<SendResult | null> {
   const to = await ownerEmail(ctx.appId)
   if (!to) return null
   const href = appUrl(`/apps/${ctx.appId}`)
   const { html, text } = layout({
-    preheader: `The MKT Basic package is complete.`,
-    heading: `${ctx.appName}: MKT Basic complete`,
-    intro: `The marketing team has finished all five deliverables: tweet, article, video, AI listings, and media pitch.`,
+    preheader: `Gustavo and Joaquín have been notified.`,
+    heading: `${ctx.appName} is now in Ready for Mainnet`,
+    intro: `Refining & Legal is complete. Gustavo (CTO) and Joaquín (COO) have been notified and will review within 48 business hours. You'll get another email when they've made a decision.`,
     meta: [
       ["App", ctx.appName],
-      ["Phase", "Launched"],
-      ["Status", "MKT Basic 100% done"],
+      ["Phase", "Ready for Mainnet"],
+      ["Next", "Awaiting Gustavo + Joaquín"],
     ],
-    ctaLabel: "View app",
+    ctaLabel: "Open app",
     ctaHref: href,
   })
   return sendEmail({
     to,
-    subject: `${ctx.appName}: MKT Basic complete`,
+    subject: `${ctx.appName} is in Ready for Mainnet`,
     html,
     text,
   })
 }
 
-/** Fired when the app transitions into Launched — notifies Marketing Lead. */
+/* ================== Trigger 3 · Approved to launch — owner ================== */
+
+export async function notifyApprovedToLaunch(
+  ctx: AppEmailCtx
+): Promise<SendResult | null> {
+  const to = await ownerEmail(ctx.appId)
+  if (!to) return null
+  const href = appUrl(`/apps/${ctx.appId}`)
+  const { html, text } = layout({
+    preheader: `You can now ship ${ctx.appName} to mainnet.`,
+    heading: `${ctx.appName} is approved to launch on mainnet`,
+    intro: `Both Gustavo (CTO) and Joaquín (COO) have approved. ${ctx.appName} is cleared to ship.`,
+    meta: [
+      ["App", ctx.appName],
+      ["Phase", "Launched"],
+      ["Next step", "Deploy to mainnet, then let Marketing know"],
+    ],
+    ctaLabel: "Open app",
+    ctaHref: href,
+  })
+  return sendEmail({
+    to,
+    subject: `${ctx.appName} is approved to launch on mainnet`,
+    html,
+    text,
+  })
+}
+
+/* ================== Trigger 4 · Launched — Marketing Lead ================== */
+
 export async function notifyLaunched(
   ctx: AppEmailCtx
 ): Promise<SendResult | null> {
@@ -314,7 +149,7 @@ export async function notifyLaunched(
   const { html, text } = layout({
     preheader: `Time to fire the MKT basic package.`,
     heading: `${ctx.appName} is live — run the MKT basic package`,
-    intro: `${ctx.appName} just launched on mainnet. Kick off the MKT Basic checklist: promoted tweet, Proving Ground article, and video.`,
+    intro: `${ctx.appName} just launched on mainnet. Kick off the MKT Basic checklist: promoted tweet, Proving Ground article, video, AI product listings, and media pitch.`,
     meta: [
       ["App", ctx.appName],
       ["Phase", "Launched"],
@@ -331,10 +166,8 @@ export async function notifyLaunched(
   })
 }
 
-/**
- * Direct self-test email. Used by an admin-only debug endpoint so we can
- * verify the Resend setup end-to-end without firing a real workflow.
- */
+/* ================== Admin test email ================== */
+
 export async function sendTestEmail(to: string): Promise<SendResult> {
   const href = appUrl("/")
   const { html, text } = layout({
@@ -352,6 +185,34 @@ export async function sendTestEmail(to: string): Promise<SendResult> {
   return sendEmail({
     to,
     subject: "Test from Taiko Launchpad",
+    html,
+    text,
+  })
+}
+
+/* ================== Dormant — kept for future wiring ================== */
+
+/** Silent in production today. Kept available in case we re-enable welcome. */
+export async function notifyAppSubmitted(
+  ctx: AppEmailCtx
+): Promise<SendResult | null> {
+  const to = await ownerEmail(ctx.appId)
+  if (!to) return null
+  const href = appUrl(`/apps/${ctx.appId}`)
+  const { html, text } = layout({
+    preheader: `${ctx.appName} is in the pipeline.`,
+    heading: `${ctx.appName} is in the pipeline`,
+    intro: `You submitted ${ctx.appName}. It's now in Refining & Legal.`,
+    meta: [
+      ["App", ctx.appName],
+      ["Phase", "Refining & Legal"],
+    ],
+    ctaLabel: "Open app",
+    ctaHref: href,
+  })
+  return sendEmail({
+    to,
+    subject: `${ctx.appName} is in the pipeline`,
     html,
     text,
   })

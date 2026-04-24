@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import type { MonetizationModel } from "@/lib/db-types"
 import { notifyAppSubmitted } from "@/lib/email/notifications"
+import { reconcileAppStage } from "./[id]/actions"
 
 export type CreateAppState = {
   status: "idle" | "error" | "success"
@@ -115,14 +116,13 @@ export async function createApp(
     notes: "App submitted as MVP.",
   })
 
-  // Send a confirmation email to the owner. Failures are logged but must
-  // never prevent the redirect below.
-  try {
-    await notifyAppSubmitted({ appId: inserted.id, appName: name })
-  } catch (e) {
-    console.error("[email] submit notification failed", e)
-  }
+  // MVP is always a pass-through: the moment an app exists it moves to
+  // Refining. Don't send the owner a submit email anymore — it's noise.
+  await reconcileAppStage(inserted.id)
 
   revalidatePath("/")
   redirect(`/apps/${inserted.id}`)
 }
+
+// notifyAppSubmitted is no longer fired — kept imported for future hooks.
+void notifyAppSubmitted

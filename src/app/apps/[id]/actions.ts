@@ -9,13 +9,10 @@ import type {
   ApprovalStatus,
 } from "@/lib/db-types"
 import {
-  notifyApprovalDecision,
-  notifyEnteredRefining,
+  notifyApprovedToLaunch,
   notifyEnteredRFM,
+  notifyEnteredRFMOwner,
   notifyLaunched,
-  notifyMktCompleted,
-  notifyMonetizationReady,
-  notifyOwnerTested,
 } from "@/lib/email/notifications"
 
 type ActionResult = { ok: true } | { ok: false; error: string }
@@ -112,7 +109,10 @@ async function autoAdvanceChain(
 
     let nextStage: AppStage | null = null
 
-    if (app.current_stage === "mvp" && app.owner_tested_at) {
+    // MVP exits as soon as the app exists: submitting the form already
+    // means the owner has built something. We move straight to Refining
+    // on the same tick so users never see an app stuck in MVP.
+    if (app.current_stage === "mvp") {
       nextStage = "refining"
     } else if (app.current_stage === "refining") {
       const { data: legal } = await supabase
@@ -166,15 +166,19 @@ async function autoAdvanceChain(
       "Auto-advanced: all exit criteria met"
     )
 
-    // Fire and forget email notification for the new stage. Failures are
-    // logged inside sendEmail but must never block the stage transition.
+    // Fire-and-forget email notifications. Failures are logged but must
+    // never block the stage transition.
     const emailCtx = { appId, appName: app.name }
     try {
-      if (nextStage === "refining") {
-        await notifyEnteredRefining(emailCtx)
-      } else if (nextStage === "ready_for_mainnet") {
+      if (nextStage === "ready_for_mainnet") {
+        // Approvers (CTO + COO) get their call-to-action
         await notifyEnteredRFM(emailCtx)
+        // Owner gets a heads-up so they know it was escalated upstream
+        await notifyEnteredRFMOwner(emailCtx)
       } else if (nextStage === "launched") {
+        // Owner: "approved to launch on mainnet"
+        await notifyApprovedToLaunch(emailCtx)
+        // Marketing Lead: time to run MKT Basic
         await notifyLaunched(emailCtx)
       }
     } catch (e) {
@@ -212,12 +216,6 @@ export async function markOwnerTested(appId: string): Promise<ActionResult> {
       }
     }
 
-    const { data: full } = await supabase
-      .from("apps")
-      .select("name")
-      .eq("id", appId)
-      .maybeSingle<{ name: string }>()
-
     const { error } = await supabase
       .from("apps")
       .update({ owner_tested_at: new Date().toISOString() })
@@ -225,13 +223,6 @@ export async function markOwnerTested(appId: string): Promise<ActionResult> {
     if (error) return { ok: false, error: error.message }
 
     await autoAdvanceChain(supabase, appId, profile.id)
-    try {
-      if (full?.name) {
-        await notifyOwnerTested({ appId, appName: full.name })
-      }
-    } catch (e) {
-      console.error("[email] owner-tested notification failed", e)
-    }
     revalidatePath(`/apps/${appId}`)
     revalidatePath("/")
     return { ok: true }
@@ -240,29 +231,27 @@ export async function markOwnerTested(appId: string): Promise<ActionResult> {
   }
 }
 
-/** Mark the monetization setup as operationally ready (PM or Jonathan). */
+/** Mark the monetization setup as operationally ready (Jonathan only). */
 export async function setMonetizationOperative(
   appId: string,
   value: boolean
 ): Promise<ActionResult> {
   try {
     const { supabase, profile } = await loadActor()
+    // Per product decision, only Legal Lead (Jonathan) flips this.
+    if (profile.role !== "legal_lead") {
+      return {
+        ok: false,
+        error: "Only the Legal Lead can confirm monetization setup",
+      }
+    }
+
     const { data: app } = await supabase
       .from("apps")
-      .select("pm_id")
+      .select("id")
       .eq("id", appId)
-      .maybeSingle<{ pm_id: string }>()
+      .maybeSingle<{ id: string }>()
     if (!app) return { ok: false, error: "App not found" }
-
-    const allowed =
-      profile.role === "legal_lead" || profile.id === app.pm_id
-    if (!allowed) return { ok: false, error: "Not authorized" }
-
-    const { data: full } = await supabase
-      .from("apps")
-      .select("name")
-      .eq("id", appId)
-      .maybeSingle<{ name: string }>()
 
     const { error } = await supabase
       .from("apps")
@@ -272,13 +261,6 @@ export async function setMonetizationOperative(
 
     if (value) {
       await autoAdvanceChain(supabase, appId, profile.id)
-      try {
-        if (full?.name) {
-          await notifyMonetizationReady({ appId, appName: full.name })
-        }
-      } catch (e) {
-        console.error("[email] monetization-ready notification failed", e)
-      }
     }
     revalidatePath(`/apps/${appId}`)
     revalidatePath("/")
@@ -318,29 +300,6 @@ export async function castApproval(input: {
 
     if (input.decision === "approved")
       await autoAdvanceChain(supabase, input.appId, profile.id)
-
-    // Tell the owner somebody decided
-    try {
-      const { data: app } = await supabase
-        .from("apps")
-        .select("name")
-        .eq("id", input.appId)
-        .maybeSingle<{ name: string }>()
-      if (app?.name) {
-        await notifyApprovalDecision({
-          appId: input.appId,
-          appName: app.name,
-          decider: {
-            name: profile.full_name ?? profile.email ?? "Someone",
-            role: input.approverRole,
-          },
-          decision: input.decision,
-          comment: input.comment,
-        })
-      }
-    } catch (e) {
-      console.error("[email] approval-decision notification failed", e)
-    }
 
     revalidatePath(`/apps/${input.appId}`)
     revalidatePath("/")
@@ -529,48 +488,35 @@ export async function setMarketingCheck(input: {
       if (error) return { ok: false, error: error.message }
     }
 
-    // If this flip completes every MKT check, notify the owner exactly once
-    // (we derive that by reading the row back and checking all 5 flags).
+    // Stamp completed_at when all 5 checks are done (so UI can label the
+    // phase "completed" with a timestamp). No email fired here by design.
     if (input.value) {
-      try {
-        const { data: row } = await supabase
+      const { data: row } = await supabase
+        .from("marketing_checklist")
+        .select(
+          "promoted_tweet, proving_ground_article, video, ai_product_listings, media_pitch, completed_at"
+        )
+        .eq("app_id", input.appId)
+        .maybeSingle<{
+          promoted_tweet: boolean
+          proving_ground_article: boolean
+          video: boolean
+          ai_product_listings: boolean
+          media_pitch: boolean
+          completed_at: string | null
+        }>()
+      const allDone =
+        row &&
+        row.promoted_tweet &&
+        row.proving_ground_article &&
+        row.video &&
+        row.ai_product_listings &&
+        row.media_pitch
+      if (allDone && !row.completed_at) {
+        await supabase
           .from("marketing_checklist")
-          .select(
-            "promoted_tweet, proving_ground_article, video, ai_product_listings, media_pitch"
-          )
+          .update({ completed_at: new Date().toISOString() })
           .eq("app_id", input.appId)
-          .maybeSingle<{
-            promoted_tweet: boolean
-            proving_ground_article: boolean
-            video: boolean
-            ai_product_listings: boolean
-            media_pitch: boolean
-          }>()
-        const allDone =
-          row &&
-          row.promoted_tweet &&
-          row.proving_ground_article &&
-          row.video &&
-          row.ai_product_listings &&
-          row.media_pitch
-        if (allDone) {
-          const { data: app } = await supabase
-            .from("apps")
-            .select("name")
-            .eq("id", input.appId)
-            .maybeSingle<{ name: string }>()
-          if (app?.name) {
-            await notifyMktCompleted({ appId: input.appId, appName: app.name })
-            // stamp completed_at so we don't re-send if someone toggles
-            await supabase
-              .from("marketing_checklist")
-              .update({ completed_at: new Date().toISOString() })
-              .eq("app_id", input.appId)
-              .is("completed_at", null)
-          }
-        }
-      } catch (e) {
-        console.error("[email] mkt-completed notification failed", e)
       }
     }
 
