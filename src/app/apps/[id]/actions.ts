@@ -152,7 +152,9 @@ async function autoAdvanceChain(
       current_stage: nextStage,
       stage_entered_at: new Date().toISOString(),
     }
-    if (nextStage === "launched") patch.launched_at = new Date().toISOString()
+    // launched_at is intentionally NOT set here: "approved to launch"
+    // is a different state from "actually live on mainnet". The owner
+    // flips launched_at via the "Mark live on mainnet" button.
     if (nextStage === "ready_for_mainnet")
       patch.ready_for_mainnet_window_start = new Date().toISOString()
 
@@ -176,10 +178,9 @@ async function autoAdvanceChain(
         // Owner gets a heads-up so they know it was escalated upstream
         await notifyEnteredRFMOwner(emailCtx)
       } else if (nextStage === "launched") {
-        // Owner: "approved to launch on mainnet"
+        // Owner only: "approved to launch". Tiffany is notified LATER,
+        // when the owner marks the app as live on mainnet.
         await notifyApprovedToLaunch(emailCtx)
-        // Marketing Lead: time to run MKT Basic
-        await notifyLaunched(emailCtx)
       }
     } catch (e) {
       console.error("[email] notification failed for stage", nextStage, e)
@@ -434,6 +435,63 @@ export async function advanceStage(input: {
     )
 
     revalidatePath(`/apps/${input.appId}`)
+    revalidatePath("/")
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * Owner confirms the app is actually deployed and live on mainnet. This is
+ * distinct from the CTO+COO approval: approval = cleared to ship, this = shipped.
+ * Flipping it stamps launched_at and fires the MKT notification to Tiffany.
+ */
+export async function markLiveOnMainnet(
+  appId: string,
+  live: boolean
+): Promise<ActionResult> {
+  try {
+    const { supabase, profile } = await loadActor()
+    const { data: app } = await supabase
+      .from("apps")
+      .select("pm_id, name, current_stage")
+      .eq("id", appId)
+      .maybeSingle<{
+        pm_id: string
+        name: string
+        current_stage: AppStage
+      }>()
+    if (!app) return { ok: false, error: "App not found" }
+    if (app.pm_id !== profile.id) {
+      return {
+        ok: false,
+        error: "Only the owner can mark the app live on mainnet",
+      }
+    }
+    if (app.current_stage !== "launched") {
+      return {
+        ok: false,
+        error:
+          "The app must be approved (Gustavo + Joaquín) before it can be marked live",
+      }
+    }
+
+    const { error } = await supabase
+      .from("apps")
+      .update({ launched_at: live ? new Date().toISOString() : null })
+      .eq("id", appId)
+    if (error) return { ok: false, error: error.message }
+
+    if (live) {
+      try {
+        await notifyLaunched({ appId, appName: app.name })
+      } catch (e) {
+        console.error("[email] notifyLaunched failed", e)
+      }
+    }
+
+    revalidatePath(`/apps/${appId}`)
     revalidatePath("/")
     return { ok: true }
   } catch (e) {

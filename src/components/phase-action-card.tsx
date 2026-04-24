@@ -5,6 +5,7 @@ import { Check, X, Loader2, AlertCircle, ArrowRight } from "lucide-react"
 import type { Phase } from "@/lib/progress"
 import {
   markOwnerTested,
+  markLiveOnMainnet,
   setMonetizationOperative,
   castApproval,
   advanceStage,
@@ -227,6 +228,19 @@ function CheckAction({
           }
         />
       )
+  }
+  if (phaseKey === "launched" && check.id === "live") {
+    return (
+      <AsyncButton
+        disabled={!actor.isOwner}
+        disabledHint="Only the owner can confirm"
+        done={check.state === "done"}
+        onClick={() => markLiveOnMainnet(appId, true)}
+        onUndo={() => markLiveOnMainnet(appId, false)}
+        label="Mark live on mainnet"
+        confirmLabel="Live"
+      />
+    )
   }
   if (phaseKey === "mkt") {
     const field =

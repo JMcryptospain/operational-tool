@@ -69,6 +69,7 @@ export function computeAppProgress(input: {
     | "created_at"
     | "monetization_setup_complete"
     | "owner_tested_at"
+    | "launched_at"
   >
   approvals: ApprovalRow[]
   marketing: MarketingChecklist | null
@@ -168,23 +169,40 @@ export function computeAppProgress(input: {
   }
 
   // --- 4. Launched
+  // The phase is "active" the moment both approvers sign off (stage flips
+  // to 'launched'), but it's only "completed" once the owner confirms the
+  // app is actually live on mainnet (launched_at is stamped).
+  const isLive = Boolean(input.app.launched_at)
+  const liveCheckState: CheckState = isLive
+    ? "done"
+    : rank >= 3
+      ? "pending"
+      : "not_started"
   const launchedPhase: Phase = {
     key: "launched",
     label: "Launched",
-    state: phaseState(3),
+    state: isLive
+      ? "completed"
+      : rank >= 3
+        ? "active"
+        : "pending",
     checks: [
       {
         id: "live",
-        label: "Live",
-        state: rank >= 3 ? "done" : rank === 2 ? "pending" : "not_started",
+        label: "Live on mainnet",
+        title: "Owner · App is deployed and live",
+        state: liveCheckState,
       },
     ],
   }
 
   // --- 5. MKT basic
+  // Stays "not_started" until the owner marks the app live on mainnet,
+  // even if both approvers have already signed off. Tiffany doesn't start
+  // the push until the app is actually shipping.
   const mkt = input.marketing
   const mktCheckState = (flag: boolean): CheckState =>
-    flag ? "done" : rank >= 3 ? "pending" : "not_started"
+    flag ? "done" : isLive ? "pending" : "not_started"
 
   const allMktDone = Boolean(
     mkt &&
@@ -199,7 +217,7 @@ export function computeAppProgress(input: {
     label: "MKT Basic",
     state: allMktDone
       ? "completed"
-      : rank >= 3
+      : isLive
         ? "active"
         : "pending",
     checks: [

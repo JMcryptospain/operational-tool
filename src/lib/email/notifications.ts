@@ -121,12 +121,18 @@ export async function notifyApprovedToLaunch(
   const { html, text } = layout({
     preheader: `You can now ship ${ctx.appName} to mainnet.`,
     heading: `${ctx.appName} is approved to launch on mainnet`,
-    intro: `Both Gustavo (CTO) and Joaquín (COO) have approved. ${ctx.appName} is cleared to ship.`,
+    intro: `Both Gustavo (CTO) and Joaqu\u00edn (COO) have approved. ${ctx.appName} is cleared to ship.`,
     meta: [
       ["App", ctx.appName],
-      ["Phase", "Launched"],
-      ["Next step", "Deploy to mainnet, then let Marketing know"],
+      ["Phase", "Launched (awaiting deployment)"],
+      ["Next step", "Deploy, then mark the app live on mainnet"],
     ],
+    body: `<p style="margin:0;">
+      <strong>Important:</strong> once the app is actually deployed and live
+      on mainnet, remember to open its page on Launchpad and click
+      <em>Mark live on mainnet</em>. That's what triggers the marketing
+      handoff \u2014 without it, Tiffany doesn't know to start the MKT push.
+    </p>`,
     ctaLabel: "Open app",
     ctaHref: href,
   })
