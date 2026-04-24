@@ -51,6 +51,7 @@ export type Profile = {
 
 export type App = {
   id: string
+  slug: string
   name: string
   value_hypothesis: string
   target_user: string

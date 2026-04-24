@@ -1,10 +1,12 @@
 "use server"
 
+import { randomUUID } from "node:crypto"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import type { MonetizationModel } from "@/lib/db-types"
 import { notifyAppSubmitted } from "@/lib/email/notifications"
+import { buildAppSlug } from "@/lib/slug"
 import { reconcileAppStage } from "./[id]/actions"
 
 export type CreateAppState = {
@@ -83,9 +85,16 @@ export async function createApp(
     }
   }
 
+  // Generate the id client-side so we can derive the PostHog slug from it
+  // in the same insert. This keeps the slug stable across backups/restores.
+  const appId = randomUUID()
+  const slug = buildAppSlug(name, appId)
+
   const { data: inserted, error } = await supabase
     .from("apps")
     .insert({
+      id: appId,
+      slug,
       name,
       value_hypothesis: valueHypothesis,
       target_user: targetUser,

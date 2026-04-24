@@ -191,17 +191,14 @@ async function autoAdvanceChain(
 }
 
 /**
- * Wire PostHog analytics to an app. Parses the pasted URL, extracts the
- * host + project id, marks analytics_wired_at if the URL is valid.
- *
- * Examples we accept:
- *   https://eu.posthog.com/project/12345
- *   https://app.posthog.com/project/12345
- *   https://eu.posthog.com/project/12345/home
+ * Owner self-declares that they've installed the shared-project PostHog
+ * snippet and called `posthog.group('app', '<slug>')`. We trust the owner
+ * (PostHog free tier only gives us 1 project so every Taiko app shares
+ * the same project). Unwire with value=false.
  */
 export async function wireAnalytics(input: {
   appId: string
-  url: string
+  installed: boolean
 }): Promise<ActionResult> {
   try {
     const { supabase, profile } = await loadActor()
@@ -216,67 +213,16 @@ export async function wireAnalytics(input: {
       return { ok: false, error: "Only the owner can wire analytics" }
     }
 
-    const raw = input.url.trim()
-    if (!raw) {
-      // Clear the wire
-      await supabase
-        .from("apps")
-        .update({
-          posthog_project_url: null,
-          posthog_project_id: null,
-          posthog_host: null,
-          analytics_wired_at: null,
-        })
-        .eq("id", input.appId)
-      revalidatePath(`/apps/${input.appId}`)
-      revalidatePath("/")
-      return { ok: true }
-    }
-
-    // Validate it looks like a PostHog project URL
-    let parsed: URL
-    try {
-      parsed = new URL(raw)
-    } catch {
-      return { ok: false, error: "That doesn't look like a URL" }
-    }
-    if (parsed.protocol !== "https:") {
-      return { ok: false, error: "URL must start with https://" }
-    }
-    const host = parsed.host.toLowerCase()
-    const isPosthogHost =
-      host === "eu.posthog.com" ||
-      host === "app.posthog.com" ||
-      host === "us.posthog.com" ||
-      host.endsWith(".posthog.com")
-    if (!isPosthogHost) {
-      return {
-        ok: false,
-        error: "URL must be a posthog.com project URL",
-      }
-    }
-    // Extract the project id from /project/<id>/...
-    const match = parsed.pathname.match(/\/project\/(\d+)/)
-    if (!match) {
-      return {
-        ok: false,
-        error: "URL must include /project/<id>",
-      }
-    }
-    const projectId = match[1]
-
     const { error } = await supabase
       .from("apps")
       .update({
-        posthog_project_url: parsed.toString(),
-        posthog_project_id: projectId,
-        posthog_host: `https://${host}`,
-        analytics_wired_at: new Date().toISOString(),
+        analytics_wired_at: input.installed ? new Date().toISOString() : null,
       })
       .eq("id", input.appId)
     if (error) return { ok: false, error: error.message }
 
-    await autoAdvanceChain(supabase, input.appId, profile.id)
+    if (input.installed)
+      await autoAdvanceChain(supabase, input.appId, profile.id)
     revalidatePath(`/apps/${input.appId}`)
     revalidatePath("/")
     return { ok: true }

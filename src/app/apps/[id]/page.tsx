@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation"
 import { ArrowLeft, ExternalLink, Code2 } from "lucide-react"
 
 import { reconcileAppStage } from "@/app/apps/[id]/actions"
+import { AnalyticsSnippet } from "@/components/analytics-snippet"
 import {
   CommentsThread,
   type CommentNode,
@@ -222,6 +223,13 @@ export default async function AppDetailPage({
             </div>
           )}
         </header>
+
+        {/* Analytics snippet — visible to the owner only */}
+        {actor.isOwner && (
+          <div className="mb-4">
+            <AnalyticsSnippet slug={app.slug} />
+          </div>
+        )}
 
         {/* Phase cards */}
         <div className="grid gap-4 lg:grid-cols-2">
