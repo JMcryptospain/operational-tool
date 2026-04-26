@@ -1,22 +1,21 @@
 import { createClient } from "@supabase/supabase-js"
-import {
-  notifyRFMExpired,
-  notifyRFMWarning,
-} from "@/lib/email/notifications"
+import { notifyRFMExpired } from "@/lib/email/notifications"
 import { businessHoursBetween } from "@/lib/pipeline"
 
 /**
- * Cron handler invoked hourly by Vercel Cron.
+ * Cron handler invoked daily by Vercel Cron at 09:00 Madrid time.
  *
- * Scans every app in Ready for Mainnet and:
- *   1. If the 48h business-hours window has passed AND no "expired"
- *      reminder has been sent, emits notifyRFMExpired and records it.
- *   2. Otherwise, if there are ≤12 business hours left AND no "warning"
- *      reminder has been sent, emits notifyRFMWarning to the approvers
- *      who haven't voted yet, and records it.
+ * Hobby plan only allows one cron run per day, so this runs once a day
+ * and:
+ *   - For every app in Ready for Mainnet whose 48-business-hour window
+ *     has elapsed without both approvers signing off, sends an extra
+ *     nudge email to whichever approver still hasn't decided.
+ *   - Idempotent within a single window: rfm_reminders_sent prevents
+ *     re-sending the same reminder. We do NOT send pre-deadline warnings
+ *     (the dashboard already flags the row visually).
  *
- * Auth: requires a Bearer token matching CRON_SECRET. Vercel Cron sends
- * that header automatically when the env var is set on the project.
+ * Auth: requires Bearer CRON_SECRET. Vercel Cron sends that header
+ * automatically when the env var is set.
  */
 
 // Edge runtime would be cheaper but the Supabase client prefers Node.
@@ -25,7 +24,6 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 const REVIEW_BUDGET_HOURS = 48
-const WARNING_THRESHOLD_HOURS_REMAINING = 12
 
 type ApprovalRow = {
   approver_role: "cto" | "coo"
@@ -68,8 +66,6 @@ export async function GET(req: Request) {
   const sb = adminClient()
   const now = new Date()
 
-  // Pull all apps currently in RFM with their approvals + any reminders
-  // we've already sent. Limit to a sane batch size.
   const { data: apps, error } = await sb
     .from("apps")
     .select(
@@ -91,7 +87,6 @@ export async function GET(req: Request) {
       app.ready_for_mainnet_window_start ?? app.stage_entered_at
     )
     const elapsedHours = businessHoursBetween(windowStart, now)
-    const remaining = REVIEW_BUDGET_HOURS - elapsedHours
 
     const missing: Array<"cto" | "coo"> = (["cto", "coo"] as const).filter(
       (role) => {
@@ -100,9 +95,13 @@ export async function GET(req: Request) {
       }
     )
 
-    const sent = new Set(app.reminders.map((r) => r.kind))
+    const alreadySent = app.reminders.some((r) => r.kind === "expired")
 
-    if (elapsedHours >= REVIEW_BUDGET_HOURS && !sent.has("expired")) {
+    if (
+      elapsedHours >= REVIEW_BUDGET_HOURS &&
+      !alreadySent &&
+      missing.length > 0
+    ) {
       const r = await notifyRFMExpired({
         appId: app.id,
         appName: app.name,
@@ -123,35 +122,7 @@ export async function GET(req: Request) {
       continue
     }
 
-    if (
-      remaining > 0 &&
-      remaining <= WARNING_THRESHOLD_HOURS_REMAINING &&
-      !sent.has("warning") &&
-      missing.length > 0
-    ) {
-      const r = await notifyRFMWarning({
-        appId: app.id,
-        appName: app.name,
-        missingRoles: missing,
-        hoursRemaining: remaining,
-      })
-      if (r?.ok) {
-        await sb.from("rfm_reminders_sent").insert({
-          app_id: app.id,
-          kind: "warning",
-        })
-      }
-      summary.push({
-        app: app.name,
-        action: "warning",
-        remaining,
-        sent: r?.ok ?? false,
-        error: r && !r.ok ? r.error : undefined,
-      })
-      continue
-    }
-
-    summary.push({ app: app.name, action: "skip", elapsedHours, remaining })
+    summary.push({ app: app.name, action: "skip", elapsedHours })
   }
 
   return Response.json({ ok: true, processed: summary.length, summary })
