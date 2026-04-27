@@ -69,12 +69,14 @@ export async function createApp(
     fieldErrors.live_url = "Must be a valid URL."
 
   let monetizationModel: MonetizationModel | null = null
-  if (monetizationRaw) {
-    if (!MONETIZATION_MODELS.includes(monetizationRaw as MonetizationModel)) {
-      fieldErrors.monetization_model = "Pick a valid option."
-    } else {
-      monetizationModel = monetizationRaw as MonetizationModel
-    }
+  if (!monetizationRaw) {
+    fieldErrors.monetization_model = "Pick a monetization model."
+  } else if (
+    !MONETIZATION_MODELS.includes(monetizationRaw as MonetizationModel)
+  ) {
+    fieldErrors.monetization_model = "Pick a valid option."
+  } else {
+    monetizationModel = monetizationRaw as MonetizationModel
   }
 
   if (Object.keys(fieldErrors).length > 0) {

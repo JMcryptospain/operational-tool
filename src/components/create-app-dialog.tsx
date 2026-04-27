@@ -192,14 +192,13 @@ export function CreateAppDialog() {
           <div className="grid gap-6 sm:grid-cols-2">
             <Field
               label="Monetization model"
-              optional
-              hint="Can be set later."
               error={err("monetization_model")}
             >
               <select
                 id="monetization_model"
                 name="monetization_model"
                 className={inputClass}
+                required
                 defaultValue=""
               >
                 <option value="">— Select —</option>
