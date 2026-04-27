@@ -96,7 +96,7 @@ async function autoAdvanceChain(
     const { data: app } = await supabase
       .from("apps")
       .select(
-        "name, current_stage, owner_tested_at, monetization_setup_complete, analytics_wired_at"
+        "name, current_stage, owner_tested_at, monetization_setup_complete, analytics_wired_at, vetoed_at"
       )
       .eq("id", appId)
       .maybeSingle<{
@@ -105,8 +105,12 @@ async function autoAdvanceChain(
         owner_tested_at: string | null
         monetization_setup_complete: boolean
         analytics_wired_at: string | null
+        vetoed_at: string | null
       }>()
     if (!app) return
+
+    // Hard stop: vetoed apps don't advance until the veto is lifted.
+    if (app.vetoed_at) return
 
     let nextStage: AppStage | null = null
 
@@ -629,6 +633,30 @@ export async function setMarketingCheck(input: {
   }
 }
 
+/**
+ * Lift a veto on an app. Cofounders only. Doesn't delete the historical
+ * veto rows in public.vetoes — just clears the active flag on apps so the
+ * pipeline can move again.
+ */
+export async function liftVeto(appId: string): Promise<ActionResult> {
+  try {
+    const { supabase, profile } = await loadActor()
+    if (profile.role !== "cofounder") {
+      return { ok: false, error: "Only cofounders can lift a veto" }
+    }
+    const { error } = await supabase
+      .from("apps")
+      .update({ vetoed_at: null, veto_reason: null })
+      .eq("id", appId)
+    if (error) return { ok: false, error: error.message }
+    revalidatePath(`/apps/${appId}`)
+    revalidatePath("/")
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
 /* --- Cofounder veto --- */
 
 export async function castVeto(input: {
@@ -664,6 +692,17 @@ export async function castVeto(input: {
       reason,
     })
     if (error) return { ok: false, error: error.message }
+
+    // Mirror the veto on the app row so the dashboard and the auto-advance
+    // chain can see it without joining. We always overwrite with the latest
+    // reason, since a fresh veto supersedes any previous one.
+    await supabase
+      .from("apps")
+      .update({
+        vetoed_at: new Date().toISOString(),
+        veto_reason: reason,
+      })
+      .eq("id", input.appId)
 
     revalidatePath(`/apps/${input.appId}`)
     revalidatePath("/")

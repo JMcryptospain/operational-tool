@@ -71,17 +71,29 @@ export function computeAppProgress(input: {
     | "owner_tested_at"
     | "launched_at"
     | "analytics_wired_at"
+    | "vetoed_at"
   >
   approvals: ApprovalRow[]
   marketing: MarketingChecklist | null
   pmName: string | null
 }): AppProgress {
-  const status = computeAppStatus({
+  const baseStatus = computeAppStatus({
     current_stage: input.app.current_stage,
     stage_entered_at: input.app.stage_entered_at,
     created_at: input.app.created_at,
     pm: input.pmName ? { full_name: input.pmName, email: "" } : null,
   })
+
+  // Vetoed apps short-circuit to "blocked" with a hard reason. They keep
+  // whatever timer they had so the UI can still show the elapsed clock.
+  const status: typeof baseStatus = input.app.vetoed_at
+    ? {
+        ...baseStatus,
+        severity: "blocked",
+        reason: "Vetoed by a cofounder",
+        blockers: ["Cofounder"],
+      }
+    : baseStatus
 
   const rank = STAGE_RANK[input.app.current_stage]
   const phaseState = (cutoff: number): PhaseState => {

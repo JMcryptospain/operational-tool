@@ -6,6 +6,10 @@ import { reconcileAppStage } from "@/app/apps/[id]/actions"
 import { AdoptionCards } from "@/components/adoption-cards"
 import { AnalyticsSnippet } from "@/components/analytics-snippet"
 import {
+  CofounderVetoControls,
+  VetoedBanner,
+} from "@/components/cofounder-veto"
+import {
   CommentsThread,
   type CommentNode,
 } from "@/components/comments-thread"
@@ -145,6 +149,14 @@ export default async function AppDetailPage({
           </Link>
         </div>
 
+        {/* Veto banner — visible to everyone when set */}
+        {app.vetoed_at && (
+          <VetoedBanner
+            reason={app.veto_reason}
+            vetoedAt={app.vetoed_at}
+          />
+        )}
+
         {/* Header */}
         <header className="mb-6 rounded-lg border border-[color:var(--color-border)] bg-white p-6">
           <div className="flex items-start justify-between gap-6">
@@ -176,11 +188,19 @@ export default async function AppDetailPage({
               </dl>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
-              <SeverityDot severity={progress.severity} />
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[color:var(--color-fg-muted)]">
-                {progress.daysInStage}d in {STAGE_LABELS[app.current_stage]}
-              </span>
+            <div className="flex shrink-0 flex-col items-end gap-3">
+              <div className="flex items-center gap-2">
+                <SeverityDot severity={progress.severity} />
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[color:var(--color-fg-muted)]">
+                  {progress.daysInStage}d in {STAGE_LABELS[app.current_stage]}
+                </span>
+              </div>
+              <CofounderVetoControls
+                appId={app.id}
+                currentStage={app.current_stage}
+                isCofounder={actor.isCofounder}
+                isVetoed={Boolean(app.vetoed_at)}
+              />
             </div>
           </div>
 

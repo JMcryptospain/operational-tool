@@ -67,6 +67,8 @@ export type App = {
   posthog_project_url: string | null
   posthog_host: string | null
   analytics_wired_at: string | null
+  vetoed_at: string | null
+  veto_reason: string | null
   current_stage: AppStage
   stage_entered_at: string
   ready_for_mainnet_window_start: string | null
