@@ -121,6 +121,46 @@ export async function deletePreassignment(email: string): Promise<Result> {
 }
 
 /**
+ * Delete a user's profile row. Notes:
+ *  - Does NOT delete the auth.users row (that requires the auth admin
+ *    API and we don't want to ban people from logging back in).
+ *  - On next login, handle_new_user() will recreate the profile from
+ *    scratch, defaulting to the role pre-assigned in role_assignments
+ *    (or taiko_member if none).
+ *  - An admin cannot delete their own profile (would lock themselves
+ *    out of /admin until they relogin).
+ *  - The deleted profile's apps reference pm_id with no ON DELETE so
+ *    Postgres will block this if the user owns apps. The UI explains
+ *    that limitation.
+ */
+export async function deleteProfile(profileId: string): Promise<Result> {
+  try {
+    const { supabase, profile } = await requireAdmin()
+    if (profile.id === profileId) {
+      return {
+        ok: false,
+        error: "You cannot delete your own profile.",
+      }
+    }
+    const { error } = await supabase
+      .from("profiles")
+      .delete()
+      .eq("id", profileId)
+    if (error) {
+      // Friendlier message for the FK violation case
+      const msg = error.message.includes("foreign key")
+        ? "This user owns one or more apps. Reassign or delete the apps first."
+        : error.message
+      return { ok: false, error: msg }
+    }
+    revalidatePath("/admin")
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+/**
  * Send a one-off test email to the acting admin. Lets us verify the Resend
  * integration end-to-end from the admin panel without waiting for a real
  * stage transition.

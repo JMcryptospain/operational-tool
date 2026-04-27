@@ -4,6 +4,7 @@ import { useState, useTransition } from "react"
 import { CheckCircle2, Loader2, Mail, Trash2 } from "lucide-react"
 import {
   deletePreassignment,
+  deleteProfile,
   preassignRole,
   sendAdminTestEmail,
   updateProfileRole,
@@ -227,6 +228,59 @@ export function SendTestEmailButton() {
       {result?.kind === "error" && (
         <span className="text-xs text-[color:var(--color-danger)]">
           {result.error}
+        </span>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Inline "Remove" affordance shown next to each user. Asks for explicit
+ * confirmation, and surfaces the FK error inline if the user owns apps.
+ */
+export function DeleteProfileButton({
+  profileId,
+  email,
+  isSelf,
+}: {
+  profileId: string
+  email: string
+  isSelf: boolean
+}) {
+  const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  if (isSelf) return null
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => {
+          if (
+            !confirm(
+              `Remove ${email}?\n\nThe user can sign back in any time and will get a fresh profile (Taiko Member role unless pre-assigned).`
+            )
+          )
+            return
+          startTransition(async () => {
+            const r = await deleteProfile(profileId)
+            if (!r.ok) setError(r.error ?? "Failed")
+          })
+        }}
+        className="inline-flex items-center gap-1 text-xs text-[color:var(--color-fg-subtle)] transition hover:text-[color:var(--color-danger)] disabled:opacity-50"
+      >
+        {pending ? (
+          <Loader2 className="size-3 animate-spin" />
+        ) : (
+          <Trash2 className="size-3" />
+        )}
+        Remove
+      </button>
+      {error && (
+        <span className="max-w-xs text-right text-[10px] text-[color:var(--color-danger)]">
+          {error}
         </span>
       )}
     </div>

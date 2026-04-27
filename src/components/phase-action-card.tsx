@@ -485,7 +485,7 @@ const NEXT_STAGE: Partial<Record<Phase["key"], AppStage>> = {
 
 function AdvanceButton({
   appId,
-  currentStage,
+  currentStage: _currentStage,
   phase,
   actor,
 }: {

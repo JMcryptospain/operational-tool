@@ -4,6 +4,7 @@ import { TopNav } from "@/components/top-nav"
 import type { AppRole, Profile } from "@/lib/db-types"
 import { createClient } from "@/lib/supabase/server"
 import {
+  DeleteProfileButton,
   PreassignForm,
   PreassignRow,
   ProfileRoleSelect,
@@ -95,6 +96,7 @@ export default async function AdminPage() {
                 <th className="px-5 py-2 text-left font-normal">Name</th>
                 <th className="px-5 py-2 text-left font-normal">Email</th>
                 <th className="px-5 py-2 text-left font-normal">Role</th>
+                <th className="px-5 py-2 text-right font-normal">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -116,6 +118,13 @@ export default async function AdminPage() {
                       isSelf={p.id === profile?.id}
                     />
                   </td>
+                  <td className="px-5 py-2.5 text-right">
+                    <DeleteProfileButton
+                      profileId={p.id}
+                      email={p.email}
+                      isSelf={p.id === profile?.id}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -129,7 +138,7 @@ export default async function AdminPage() {
               Pre-assign roles
             </h2>
             <p className="mt-0.5 text-xs text-[color:var(--color-fg-muted)]">
-              Assign a role to an email before they sign in. They'll
+              Assign a role to an email before they sign in. They&apos;ll
               inherit it automatically on first login.
             </p>
           </div>

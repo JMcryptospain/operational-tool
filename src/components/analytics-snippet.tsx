@@ -95,7 +95,7 @@ export function AnalyticsSnippet({
             title="1. Install the PostHog snippet"
             hint={
               <>
-                Paste inside your app's{" "}
+                Paste inside your app&apos;s{" "}
                 <code className="rounded bg-[color:var(--color-bg-subtle)] px-1">
                   &lt;head&gt;
                 </code>
@@ -104,7 +104,7 @@ export function AnalyticsSnippet({
                   &lt;YOUR_POSTHOG_API_KEY&gt;
                 </code>{" "}
                 with the key from the shared Taiko project settings (ask the
-                admin if you don't have it).
+                admin if you don&apos;t have it).
               </>
             }
             code={snippet}
